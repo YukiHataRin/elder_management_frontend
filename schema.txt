@@ -1,0 +1,27 @@
+{
+  "properties": {
+    "user_id": {
+      "type": "integer",
+      "title": "User Id"
+    },
+    "mission_id": {
+      "type": "integer",
+      "title": "Mission Id"
+    },
+    "is_compulsory": {
+      "type": "boolean",
+      "title": "Is Compulsory"
+    },
+    "mission": {
+      "$ref": "#/components/schemas/Mission"
+    }
+  },
+  "type": "object",
+  "required": [
+    "user_id",
+    "mission_id",
+    "is_compulsory",
+    "mission"
+  ],
+  "title": "MissionList"
+}

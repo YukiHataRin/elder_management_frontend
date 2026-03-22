@@ -1,0 +1,2716 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Elderly Care API - V2",
+    "description": "\n## Elderly Care API V2 (Latest)\n這是最新的 API 分離架構版本。\n\n👉 **[點我切換至 API V1 (舊版本)](/api/v1/docs)**\n",
+    "version": "2.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v2"
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth (Shared V2)"
+        ],
+        "summary": "Login Access Token",
+        "description": "(V2 Shared) OAuth2 相容的登入接口，成功後回傳 Access Token。",
+        "operationId": "login_access_token_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_login_access_token_auth_login_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/{asset_id}": {
+      "get": {
+        "tags": [
+          "Assets (Shared V2)"
+        ],
+        "summary": "Download Asset",
+        "description": "(V2 Shared) 下載或串流任務資源檔案。",
+        "operationId": "download_asset_assets__asset_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Download Asset Assets  Asset Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Assets (Shared V2)"
+        ],
+        "summary": "Delete Asset",
+        "description": "(V2 Admin/Manager) 刪除資產檔案。",
+        "operationId": "delete_asset_assets__asset_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataAsset"
+                  },
+                  "title": "Response Delete Asset Assets  Asset Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/": {
+      "post": {
+        "tags": [
+          "Assets (Shared V2)"
+        ],
+        "summary": "Create Asset",
+        "description": "(V2 Admin/Manager) 上傳任務附件檔案。",
+        "operationId": "create_asset_assets__post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_asset_assets__post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataAsset"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/app/me": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Read User Me",
+        "description": "(V2 App) 取得當前登入的使用者帳號資訊。\n\n- **輸入**: 無\n- **回傳**: `schemas.User`",
+        "operationId": "read_user_me_app_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/app/me/health": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Read User Me Health",
+        "description": "(V2 App) 取得當前使用者的健康狀態。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.UserIllness]`",
+        "operationId": "read_user_me_health_app_me_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserIllness"
+                  },
+                  "type": "array",
+                  "title": "Response Read User Me Health App Me Health Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/app/me/missions": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Read User Me Missions",
+        "description": "(V2 App) 取得當前使用者被指派的任務清單。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.MissionLog]`",
+        "operationId": "read_user_me_missions_app_me_missions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MissionLog"
+                  },
+                  "type": "array",
+                  "title": "Response Read User Me Missions App Me Missions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/app/me/missions/{mission_log_id}": {
+      "put": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Update User Mission",
+        "description": "(V2 App) 更新任務執行狀態與評分。\n\n- **輸入**: \n    - `mission_log_id`: 任務指派紀錄 ID (路徑參數)\n    - `user_in`: `schemas.MissionLogUpdate`\n- **回傳**: `schemas.MissionLog`",
+        "operationId": "update_user_mission_app_me_missions__mission_log_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Log Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionLogUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionLog"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/app/me/missions/{mission_log_id}/data": {
+      "post": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Create Mission Return",
+        "description": "(V2 App) 使用者回傳任務執行結果檔案。\n\n- **輸入**: \n    - `mission_log_id`: 任務指派紀錄 ID (路徑參數)\n    - `file`: 上傳的檔案 (Multipart/form-data)\n- **回傳**: `schemas.MissionReturn`",
+        "operationId": "create_mission_return_app_me_missions__mission_log_id__data_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Log Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_mission_return_app_me_missions__mission_log_id__data_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionReturn"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/app/me/missions/{mission_id}/data": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Read User Mission Data",
+        "description": "(V2 App) 獲取特定任務的多媒體教學資產（如影片、圖片連結）。\n\n- **輸入**: \n    - `mission_id`: 任務 ID (路徑參數)\n- **回傳**: `List[schemas.MissionDataRelation]`",
+        "operationId": "read_user_mission_data_app_me_missions__mission_id__data_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MissionDataRelation"
+                  },
+                  "title": "Response Read User Mission Data App Me Missions  Mission Id  Data Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/app/me/missions/elective": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Get Elective Missions",
+        "description": "(V2 App) 獲取使用者可選取的選修任務列表。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.MissionList]`",
+        "operationId": "get_elective_missions_app_me_missions_elective_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MissionList"
+                  },
+                  "type": "array",
+                  "title": "Response Get Elective Missions App Me Missions Elective Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/app/me/missions/elective/{mission_id}": {
+      "put": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Update Elective Mission",
+        "description": "(V2 App) 使用者選擇並開啟一項選修任務。\n\n- **輸入**: \n    - `mission_id`: 任務 ID (路徑參數)\n- **回傳**: `schemas.MissionLog`",
+        "operationId": "update_elective_mission_app_me_missions_elective__mission_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionLog"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/app/me/missions/location": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Read User Location History",
+        "description": "(V2 App) 取得該使用者過去的所有地理位置紀錄。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.UserLocationHistory]`",
+        "operationId": "read_user_location_history_app_me_missions_location_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserLocationHistory"
+                  },
+                  "type": "array",
+                  "title": "Response Read User Location History App Me Missions Location Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Create User Location History",
+        "description": "(V2 App) 紀錄使用者當前的地理位置資訊。\n\n- **輸入**: `schemas.UserLocationHistoryCreate`\n- **回傳**: `schemas.UserLocationHistory`",
+        "operationId": "create_user_location_history_app_me_missions_location_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLocationHistoryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLocationHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/users": {
+      "get": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Read Managed Users",
+        "description": "(V2 Management) 獲取受管理的使用者清單。\n- 超級管理員 (Role 1): 獲取系統內所有病患。\n- 個管師 (Role 2): 僅獲取分配給自己的病患。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.User]`",
+        "operationId": "read_managed_users_management_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  },
+                  "type": "array",
+                  "title": "Response Read Managed Users Management Users Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Create User",
+        "description": "(V2 Management) 建立新使用者。\n\n- **輸入**: `schemas.UserCreate`\n- **回傳**: `schemas.User`",
+        "operationId": "create_user_management_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/backend": {
+      "get": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Read Backend Users",
+        "description": "(V2 Management) 獲取所有後端帳號清單。\n\n- **輸入**: \n    - `role_id`: 篩選特定角色 ID (可選)\n- **回傳**: `List[schemas.User]`",
+        "operationId": "read_backend_users_management_backend_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  },
+                  "title": "Response Read Backend Users Management Backend Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/users/{user_id}": {
+      "get": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Read User Detail",
+        "description": "(V2 Management) 獲取特定使用者詳情。包含越權防護邏輯。\n\n- **輸入**: \n    - `user_id`: 使用者 ID (路徑參數)\n- **回傳**: `schemas.User`",
+        "operationId": "read_user_detail_management_users__user_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Delete User",
+        "description": "(V2 Management) 刪除使用者帳號。\n\n- **輸入**: \n    - `user_id`: 使用者 ID (路徑參數)\n- **回傳**: 無 (204 No Content)",
+        "operationId": "delete_user_management_users__user_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete User Management Users  User Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/users/{user_id}/role": {
+      "patch": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Update User Role",
+        "description": "(V2 Management) 審核帳號或更新角色。\n\n- **輸入**: \n    - `user_id`: 使用者 ID (路徑參數)\n    - `role_in`: `schemas.UserUpdate`\n- **回傳**: `schemas.User`",
+        "operationId": "update_user_role_management_users__user_id__role_patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/assign": {
+      "post": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Assign User To Manager",
+        "description": "(V2 Management) 指派使用者給個管師。\n\n- **輸入**: `schemas.UserManagerCreate`\n- **回傳**: `{\"message\": \"分配成功\"}`",
+        "operationId": "assign_user_to_manager_management_assign_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserManagerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Assign User To Manager Management Assign Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/unassign": {
+      "delete": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Unassign User From Manager",
+        "description": "(V2 Management) 解除分配關係。\n\n- **輸入**: `schemas.UserManagerCreate`\n- **回傳**: `{\"message\": \"已解除分配\"}`",
+        "operationId": "unassign_user_from_manager_management_unassign_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserManagerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Unassign User From Manager Management Unassign Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/manager-assigned/{manager_id}": {
+      "get": {
+        "tags": [
+          "Management User (V2)"
+        ],
+        "summary": "Read Manager Assigned Users",
+        "description": "(V2 Management) 查詢特定個管師負責的用戶。\n\n- **輸入**: \n    - `manager_id`: 個管師 ID (路徑參數)\n- **回傳**: `List[schemas.User]`",
+        "operationId": "read_manager_assigned_users_management_manager_assigned__manager_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "manager_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Manager Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  },
+                  "title": "Response Read Manager Assigned Users Management Manager Assigned  Manager Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/missions": {
+      "get": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Read Missions",
+        "description": "(V2) 取得所有任務清單。僅限管理員或個案管理師使用。",
+        "operationId": "read_missions_management_missions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Mission"
+                  },
+                  "type": "array",
+                  "title": "Response Read Missions Management Missions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Create Mission",
+        "description": "(V2) 建立新任務。僅限管理員或個案管理師使用。",
+        "operationId": "create_mission_management_missions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mission"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/missions/{mission_id}": {
+      "put": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Update Mission",
+        "description": "(V2 Admin/Manager) 更新任務內容。",
+        "operationId": "update_mission_management_missions__mission_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mission"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Delete Mission",
+        "description": "(V2 Admin/Manager) 刪除任務並回傳新的任務列表。",
+        "operationId": "delete_mission_management_missions__mission_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Mission"
+                  },
+                  "title": "Response Delete Mission Management Missions  Mission Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/missions/elective": {
+      "get": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Read Missions Elective",
+        "description": "(V2 Admin/Manager) 取得所有任務指派清單 (MissionList)。",
+        "operationId": "read_missions_elective_management_missions_elective_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MissionList"
+                  },
+                  "type": "array",
+                  "title": "Response Read Missions Elective Management Missions Elective Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Create Mission Elective",
+        "description": "(V2 Admin/Manager) 指派任務給使用者 (MissionList)。",
+        "operationId": "create_mission_elective_management_missions_elective_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionListCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/missions/elective/mission/{mission_id}/user/{user_id}": {
+      "put": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Update Mission Elective",
+        "description": "(V2 Admin/Manager) 更新任務指派屬性 (例如: 是否必修)。",
+        "operationId": "update_mission_elective_management_missions_elective_mission__mission_id__user__user_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "is_compulsory",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean",
+              "title": "Is Compulsory"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Delete Mission Elective",
+        "description": "(V2 Admin/Manager) 刪除特定使用者的任務指派紀錄。",
+        "operationId": "delete_mission_elective_management_missions_elective_mission__mission_id__user__user_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MissionList"
+                  },
+                  "title": "Response Delete Mission Elective Management Missions Elective Mission  Mission Id  User  User Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/missions/data": {
+      "get": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Read Missions Data",
+        "description": "(V2 Admin/Manager) 取得所有任務與資產的關聯列表。",
+        "operationId": "read_missions_data_management_missions_data_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MissionDataRelation"
+                  },
+                  "type": "array",
+                  "title": "Response Read Missions Data Management Missions Data Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Create Mission Data Relation",
+        "description": "(V2 Admin/Manager) 將資料資產與任務建立連結。",
+        "operationId": "create_mission_data_relation_management_missions_data_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionDataRelationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionDataRelation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/missions/data/mission/{mission_id}/data/{data_asset_id}}": {
+      "delete": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Delete Mission Data Relation",
+        "description": "(V2 Admin/Manager) 刪除特定任務與資產的連結。",
+        "operationId": "delete_mission_data_relation_management_missions_data_mission__mission_id__data__data_asset_id___delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          },
+          {
+            "name": "data_asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Data Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MissionDataRelation"
+                  },
+                  "title": "Response Delete Mission Data Relation Management Missions Data Mission  Mission Id  Data  Data Asset Id   Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_create_asset_assets__post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_asset_assets__post"
+      },
+      "Body_create_mission_return_app_me_missions__mission_log_id__data_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_mission_return_app_me_missions__mission_log_id__data_post"
+      },
+      "Body_login_access_token_auth_login_post": {
+        "properties": {
+          "grant_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^password$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Type"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": ""
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "format": "password",
+            "title": "Client Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "Body_login_access_token_auth_login_post"
+      },
+      "DataAsset": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "file_type_id": {
+            "type": "integer",
+            "title": "File Type Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "file_type": {
+            "$ref": "#/components/schemas/FileType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "file_type_id",
+          "id",
+          "file_type"
+        ],
+        "title": "DataAsset",
+        "description": "API 回傳時的資料資產格式"
+      },
+      "FileType": {
+        "properties": {
+          "extension": {
+            "type": "string",
+            "title": "Extension"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "extension",
+          "id"
+        ],
+        "title": "FileType",
+        "description": "API 回傳時的檔案類型格式"
+      },
+      "Gender": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id"
+        ],
+        "title": "Gender"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthDomain": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "id"
+        ],
+        "title": "HealthDomain",
+        "description": "API 回傳時的健康領域格式"
+      },
+      "IllnessStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id"
+        ],
+        "title": "IllnessStatus",
+        "description": "API 回傳時的疾病狀態格式"
+      },
+      "IllnessType": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id"
+        ],
+        "title": "IllnessType",
+        "description": "API 回傳時的疾病種類格式"
+      },
+      "Mission": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "health_domain_id": {
+            "type": "integer",
+            "title": "Health Domain Id"
+          },
+          "mission_type_id": {
+            "type": "integer",
+            "title": "Mission Type Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "health_domain": {
+            "$ref": "#/components/schemas/HealthDomain"
+          },
+          "mission_type": {
+            "$ref": "#/components/schemas/MissionType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "detail",
+          "health_domain_id",
+          "mission_type_id",
+          "id",
+          "health_domain",
+          "mission_type"
+        ],
+        "title": "Mission",
+        "description": "API 回傳時的任務格式"
+      },
+      "MissionCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "health_domain_id": {
+            "type": "integer",
+            "title": "Health Domain Id"
+          },
+          "mission_type_id": {
+            "type": "integer",
+            "title": "Mission Type Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "detail",
+          "health_domain_id",
+          "mission_type_id"
+        ],
+        "title": "MissionCreate",
+        "description": "建立新任務時所需的資料"
+      },
+      "MissionDataRelation": {
+        "properties": {
+          "mission_id": {
+            "type": "integer",
+            "title": "Mission Id"
+          },
+          "data_asset_id": {
+            "type": "integer",
+            "title": "Data Asset Id"
+          },
+          "mission": {
+            "$ref": "#/components/schemas/Mission"
+          },
+          "data_asset": {
+            "$ref": "#/components/schemas/DataAsset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mission_id",
+          "data_asset_id",
+          "mission",
+          "data_asset"
+        ],
+        "title": "MissionDataRelation",
+        "description": "API 回傳時的關聯格式"
+      },
+      "MissionDataRelationCreate": {
+        "properties": {
+          "mission_id": {
+            "type": "integer",
+            "title": "Mission Id"
+          },
+          "data_asset_id": {
+            "type": "integer",
+            "title": "Data Asset Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mission_id",
+          "data_asset_id"
+        ],
+        "title": "MissionDataRelationCreate",
+        "description": "建立關聯時所需的資料"
+      },
+      "MissionList": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "mission_id": {
+            "type": "integer",
+            "title": "Mission Id"
+          },
+          "is_compulsory": {
+            "type": "boolean",
+            "title": "Is Compulsory"
+          },
+          "mission": {
+            "$ref": "#/components/schemas/Mission"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "mission_id",
+          "is_compulsory",
+          "mission"
+        ],
+        "title": "MissionList"
+      },
+      "MissionListCreate": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "mission_id": {
+            "type": "integer",
+            "title": "Mission Id"
+          },
+          "is_compulsory": {
+            "type": "boolean",
+            "title": "Is Compulsory",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "mission_id"
+        ],
+        "title": "MissionListCreate",
+        "description": "建立任務指派時所需的資料"
+      },
+      "MissionLog": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "mission_id": {
+            "type": "integer",
+            "title": "Mission Id"
+          },
+          "mission_status_id": {
+            "type": "integer",
+            "title": "Mission Status Id"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "assigned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Assigned At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "mission": {
+            "$ref": "#/components/schemas/Mission"
+          },
+          "mission_status": {
+            "$ref": "#/components/schemas/MissionStatus"
+          },
+          "expectation_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectation Score"
+          },
+          "satisfaction_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction Score"
+          },
+          "difficulty_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty Score"
+          },
+          "is_compulsory": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Compulsory"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "mission_id",
+          "mission_status_id",
+          "id",
+          "assigned_at",
+          "mission",
+          "mission_status"
+        ],
+        "title": "MissionLog",
+        "description": "API 回傳時的任務日誌格式"
+      },
+      "MissionLogUpdate": {
+        "properties": {
+          "mission_status_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mission Status Id",
+            "default": 1
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "expectation_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectation Score"
+          },
+          "satisfaction_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfaction Score"
+          },
+          "difficulty_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty Score"
+          }
+        },
+        "type": "object",
+        "title": "MissionLogUpdate",
+        "description": "更新任務進度時所需的資料"
+      },
+      "MissionReturn": {
+        "properties": {
+          "mission_log_id": {
+            "type": "integer",
+            "title": "Mission Log Id"
+          },
+          "data_asset_id": {
+            "type": "integer",
+            "title": "Data Asset Id"
+          },
+          "mission_log": {
+            "$ref": "#/components/schemas/MissionLog"
+          },
+          "data_asset": {
+            "$ref": "#/components/schemas/DataAsset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mission_log_id",
+          "data_asset_id",
+          "mission_log",
+          "data_asset"
+        ],
+        "title": "MissionReturn"
+      },
+      "MissionStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id"
+        ],
+        "title": "MissionStatus",
+        "description": "API 回傳時的任務狀態格式"
+      },
+      "MissionType": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id"
+        ],
+        "title": "MissionType",
+        "description": "API 回傳時的任務類別格式"
+      },
+      "MissionUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "health_domain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Domain Id"
+          },
+          "mission_type_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mission Type Id"
+          }
+        },
+        "type": "object",
+        "title": "MissionUpdate",
+        "description": "更新任務時所需的資料"
+      },
+      "Token": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "user_id"
+        ],
+        "title": "Token",
+        "description": "登入成功後回傳給前端的 Token 資訊"
+      },
+      "User": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "role_id": {
+            "type": "integer",
+            "title": "Role Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "id",
+          "role_id",
+          "role"
+        ],
+        "title": "User"
+      },
+      "UserCreate": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "role_id": {
+            "type": "integer",
+            "title": "Role Id",
+            "default": "3"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserDetailBase"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "password"
+        ],
+        "title": "UserCreate"
+      },
+      "UserDetail": {
+        "properties": {
+          "points": {
+            "type": "integer",
+            "title": "Points",
+            "default": 0
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date",
+            "title": "Birthday"
+          },
+          "nation_id": {
+            "type": "string",
+            "title": "Nation Id"
+          },
+          "sarcopenia_level": {
+            "type": "string",
+            "title": "Sarcopenia Level"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "gender_id": {
+            "type": "integer",
+            "title": "Gender Id",
+            "default": 1
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          }
+        },
+        "type": "object",
+        "required": [
+          "birthday",
+          "nation_id",
+          "sarcopenia_level",
+          "user_id",
+          "gender"
+        ],
+        "title": "UserDetail"
+      },
+      "UserDetailBase": {
+        "properties": {
+          "points": {
+            "type": "integer",
+            "title": "Points",
+            "default": 0
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date",
+            "title": "Birthday"
+          },
+          "nation_id": {
+            "type": "string",
+            "title": "Nation Id"
+          },
+          "sarcopenia_level": {
+            "type": "string",
+            "title": "Sarcopenia Level"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "gender_id": {
+            "type": "integer",
+            "title": "Gender Id",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "birthday",
+          "nation_id",
+          "sarcopenia_level"
+        ],
+        "title": "UserDetailBase"
+      },
+      "UserIllness": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "illness_type": {
+            "$ref": "#/components/schemas/IllnessType"
+          },
+          "illness_status": {
+            "$ref": "#/components/schemas/IllnessStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "illness_type",
+          "illness_status"
+        ],
+        "title": "UserIllness",
+        "description": "API 回傳時的疾病紀錄格式（輸出時回傳完整物件）。\n這樣前端拿到資料時，可以直接讀取 illness_type.name"
+      },
+      "UserLocationHistory": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Captured At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude",
+          "id",
+          "user_id",
+          "captured_at"
+        ],
+        "title": "UserLocationHistory"
+      },
+      "UserLocationHistoryCreate": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "UserLocationHistoryCreate"
+      },
+      "UserManagerCreate": {
+        "properties": {
+          "manager_id": {
+            "type": "integer",
+            "title": "Manager Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "manager_id",
+          "user_id"
+        ],
+        "title": "UserManagerCreate"
+      },
+      "UserRole": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "id"
+        ],
+        "title": "UserRole"
+      },
+      "UserUpdate": {
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "role_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Id"
+          }
+        },
+        "type": "object",
+        "title": "UserUpdate",
+        "description": "更新使用者帳號資料時可選擇的欄位"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {
+
+            },
+            "tokenUrl": "/api/v1/auth/login"
+          }
+        }
+      }
+    }
+  }
+}

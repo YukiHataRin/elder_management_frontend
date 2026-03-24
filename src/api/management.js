@@ -12,6 +12,13 @@ export const managementApi = {
     body: JSON.stringify(data),
   }),
 
+  // 更新使用者資料 (V2 New: /management/users/{user_id})
+  // 用於更新姓名、顯示名稱、密碼或詳細資料
+  updateUser: (userId, data) => apiFetch(`/management/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
   // 刪除使用者 (V2: /management/users/{user_id})
   deleteUser: (userId) => apiFetch(`/management/users/${userId}`, {
     method: 'DELETE',
@@ -26,10 +33,10 @@ export const managementApi = {
     return apiFetch(`/management/backend${query}`);
   },
 
-  // (超級管理員限定) 審核帳號或更新角色 (V2: /management/users/{user_id}/role)
-  updateUserRole: (userId, data) => apiFetch(`/management/users/${userId}/role`, {
+  // (超級管理員限定) 審核帳號或更新角色 (V2 Update: /management/users/{user_id}/role?role_in={id})
+  // 最新規範：role_id 改為 query parameter 傳遞
+  updateUserRole: (userId, roleId) => apiFetch(`/management/users/${userId}/role?role_in=${roleId}`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
   }),
 
   // (超級管理員限定) 將使用者分配給特定的個管師 (V2: /management/assign)
@@ -63,12 +70,12 @@ export const managementApi = {
     method: 'DELETE',
   }),
 
-  // --- 任務管理 (V2 New) ---
+  // --- 任務管理 (V2) ---
 
   // 取得所有任務清單
   getMissions: () => apiFetch('/management/missions'),
 
-  // 建立新任務
+  // 建立新任務 (V2: 可包含 return_types 要求)
   createMission: (data) => apiFetch('/management/missions', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -105,6 +112,16 @@ export const managementApi = {
     apiFetch(`/management/missions/elective/mission/${missionId}/user/${userId}`, {
       method: 'DELETE',
     }),
+
+  // --- 任務執行監看 (V2 New) ---
+
+  // 取得任務執行日誌 (查看病患是否完成、評分等)
+  getMissionLogs: () => apiFetch('/management/missions/logs'),
+
+  // 取得病患回傳的成果檔案 (查看照片、影片成果)
+  getMissionReturns: () => apiFetch('/management/missions/logs/data'),
+
+  // --- 任務資產關聯 ---
 
   // 取得所有任務與資產的關聯列表
   getMissionDataRelations: () => apiFetch('/management/missions/data'),

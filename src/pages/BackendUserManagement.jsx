@@ -14,6 +14,14 @@ const BackendUserManagement = () => {
     const [managerPatients, setManagerPatients] = useState([]);
     const [loadingPatients, setLoadingPatients] = useState(false);
 
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createFormData, setCreateFormData] = useState({
+        username: '',
+        display_name: '',
+        password: '',
+        role_id: 2 // Default to Manager
+    });
+
     const fetchUsers = async () => {
         setLoading(true);
         try {
@@ -29,9 +37,25 @@ const BackendUserManagement = () => {
         fetchUsers();
     }, [filterRole]);
 
+    const handleCreateBackendUser = async (e) => {
+        e.preventDefault();
+        try {
+            await managementApi.createUser({
+                ...createFormData,
+                role_id: parseInt(createFormData.role_id),
+                is_active: true
+            });
+            setShowCreateModal(false);
+            setCreateFormData({ username: '', display_name: '', password: '', role_id: 2 });
+            fetchUsers();
+        } catch (error) {
+            alert('建立帳號失敗: ' + error.message);
+        }
+    };
+
     const handleUpdateRole = async (userId, newRoleId) => {
         try {
-            await managementApi.updateUserRole(userId, { role_id: newRoleId });
+            await managementApi.updateUserRole(userId, newRoleId);
             fetchUsers();
         } catch (error) {
             alert('更新角色失敗: ' + error.message);
@@ -67,6 +91,12 @@ const BackendUserManagement = () => {
                     <h2 className="text-2xl font-lora font-bold text-primary">後端帳號管理</h2>
                     <p className="text-text/60 mt-1">審核及管理系統管理員與個案管理員帳號</p>
                 </div>
+                <button 
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-5 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors cursor-pointer shadow-sm flex items-center space-x-2"
+                >
+                    <span>+ 新增後端帳號</span>
+                </button>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-sky-100/50 overflow-hidden">
@@ -106,7 +136,7 @@ const BackendUserManagement = () => {
                                 </tr>
                             ) : users.map((u) => (
                                 <tr key={u.id} className="hover:bg-primary/5 transition-colors">
-                                    <td className="py-4 px-6 font-medium text-text">{u.username}</td>
+                                    <td className="py-4 px-6 font-medium text-text font-mono text-sm">{u.username}</td>
                                     <td className="py-4 px-6 text-text/70">{u.display_name}</td>
                                     <td className="py-4 px-6">{getRoleBadge(u.role_id)}</td>
                                     <td className="py-4 px-6">
@@ -121,7 +151,7 @@ const BackendUserManagement = () => {
                                                     <span className="text-xs font-bold">查看個案</span>
                                                 </button>
                                             )}
-                                            {u.role_id === 5 && (
+                                            {u.role_id === 5 ? (
                                                 <>
                                                     <button 
                                                         onClick={() => handleUpdateRole(u.id, 2)}
@@ -138,6 +168,22 @@ const BackendUserManagement = () => {
                                                         <Shield size={20} />
                                                     </button>
                                                 </>
+                                            ) : (
+                                                <button 
+                                                    onClick={async () => {
+                                                        const newPassword = window.prompt(`重設 ${u.display_name} 的密碼:`, "");
+                                                        if (newPassword) {
+                                                            try {
+                                                                await managementApi.updateUser(u.id, { password: newPassword });
+                                                                alert('密碼重設成功');
+                                                            } catch (e) { alert('重設失敗: ' + e.message); }
+                                                        }
+                                                    }}
+                                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                                    title="重設密碼"
+                                                >
+                                                    <Clock size={20} />
+                                                </button>
                                             )}
                                             {u.role_id !== 5 && u.role_id !== 1 && (
                                                 <button 
@@ -156,6 +202,84 @@ const BackendUserManagement = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Create Backend User Modal */}
+            {showCreateModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-sky-100">
+                        <div className="p-6 border-b border-sky-100 bg-sky-50/50">
+                            <h3 className="text-xl font-bold text-primary">建立後端管理帳號</h3>
+                            <p className="text-sm text-text/50 mt-1">手動建立具備管理權限的帳號</p>
+                        </div>
+                        
+                        <form onSubmit={handleCreateBackendUser} className="p-6 space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">帳號 (Username)</label>
+                                <input
+                                    required
+                                    type="text"
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                                    placeholder="例如：manager_01"
+                                    value={createFormData.username}
+                                    onChange={(e) => setCreateFormData({...createFormData, username: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">顯示名稱 (Display Name)</label>
+                                <input
+                                    required
+                                    type="text"
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    placeholder="例如：李專員"
+                                    value={createFormData.display_name}
+                                    onChange={(e) => setCreateFormData({...createFormData, display_name: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">初始密碼 (Password)</label>
+                                <input
+                                    required
+                                    type="password"
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    placeholder="請設定登入密碼"
+                                    value={createFormData.password}
+                                    onChange={(e) => setCreateFormData({...createFormData, password: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">指派角色</label>
+                                <select
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={createFormData.role_id}
+                                    onChange={(e) => setCreateFormData({...createFormData, role_id: e.target.value})}
+                                >
+                                    <option value={2}>個案管理師 (Manager)</option>
+                                    <option value={1}>超級管理員 (Admin)</option>
+                                </select>
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCreateModal(false)}
+                                    className="flex-1 py-3 px-4 border border-sky-200 text-text/60 rounded-xl font-bold hover:bg-sky-50 transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20"
+                                >
+                                    建立帳號
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Manager Patients Modal */}
             {selectedManager && (

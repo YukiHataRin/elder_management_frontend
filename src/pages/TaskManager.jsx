@@ -5,10 +5,7 @@ import { useToast } from '../context/ToastContext';
 
 const TaskManager = () => {
     const { showToast, requestConfirm } = useToast();
-    const [activeCategory, setActiveCategory] = useState('sarcopenia');
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [publishTask, setPublishTask] = useState(null);
-
+    
     // API state
     const [missions, setMissions] = useState([]);
     const [patients, setPatients] = useState([]);
@@ -16,28 +13,25 @@ const TaskManager = () => {
     const [isLoadingMissions, setIsLoadingMissions] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Dynamic categories from API
+    const [dynamicCategories, setDynamicCategories] = useState([]);
+    const [activeCategoryId, setActiveCategoryId] = useState(null);
+    const [availableMissionTypes, setAvailableMissionTypes] = useState([]);
+
+    // UI State
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [publishTask, setPublishTask] = useState(null);
+
     // Publish form state
     const [selectedPatientIds, setSelectedPatientIds] = useState([]);
     const [isCompulsory, setIsCompulsory] = useState(false);
 
     // New task form state
     const [newTaskTitle, setNewTaskTitle] = useState('');
-    const [newTaskCategory, setNewTaskCategory] = useState('肌少症');
-    const [newTaskMode, setNewTaskMode] = useState('一般任務');
+    const [newTaskDomainId, setNewTaskDomainId] = useState('');
+    const [newTaskTypeId, setNewTaskTypeId] = useState('');
     const [newTaskDesc, setNewTaskDesc] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
-
-    const categories = [
-        { id: 'social', label: '社會心理', icon: <Brain size={18} />, color: 'text-purple-600', bg: 'bg-purple-100 border-purple-200' },
-        { id: 'sarcopenia', label: '肌少症', icon: <Activity size={18} />, color: 'text-primary', bg: 'bg-sky-100 border-sky-200' },
-        { id: 'oral', label: '口腔保健', icon: <Droplet size={18} />, color: 'text-teal-600', bg: 'bg-teal-100 border-teal-200' },
-    ];
-
-    const categoryMapping = {
-        '社會心理': 'social',
-        '肌少症': 'sarcopenia',
-        '口腔保健': 'oral'
-    };
 
     const fetchMissionsAndPatients = async () => {
         setIsLoadingMissions(true);
@@ -47,7 +41,27 @@ const TaskManager = () => {
                 managementApi.getPatients(),
                 managementApi.getMissionsElective()
             ]);
-            if (Array.isArray(missionsData)) setMissions(missionsData);
+            
+            if (Array.isArray(missionsData)) {
+                setMissions(missionsData);
+                
+                // 動態提取唯一的健康領域
+                const domains = {};
+                const types = {};
+                missionsData.forEach(m => {
+                    if (m.health_domain) domains[m.health_domain.id] = m.health_domain;
+                    if (m.mission_type) types[m.mission_type.id] = m.mission_type;
+                });
+                
+                const sortedDomains = Object.values(domains);
+                setDynamicCategories(sortedDomains);
+                setAvailableMissionTypes(Object.values(types));
+                
+                // 預設選中第一個領域
+                if (sortedDomains.length > 0 && !activeCategoryId) {
+                    setActiveCategoryId(sortedDomains[0].id);
+                }
+            }
             if (Array.isArray(patientsData)) setPatients(patientsData);
             if (Array.isArray(assignmentsData)) setAllAssignments(assignmentsData);
         } catch (error) {
@@ -60,46 +74,43 @@ const TaskManager = () => {
         fetchMissionsAndPatients();
     }, []);
 
-    const combinedTasks = [];
-    missions.forEach(m => {
-        const catId = categoryMapping[m.category] || 'sarcopenia';
-        if (catId === activeCategory) {
-            combinedTasks.push({
-                id: m.id || m.mission_id,
-                title: m.name || m.title || '未命名任務',
-                target: '自訂',
-                type: m.type || '一般任務',
-                desc: m.description || m.desc || '',
-                isBackend: true
-            });
-        }
-    });
+    const combinedTasks = missions
+        .filter(m => m.health_domain_id === activeCategoryId)
+        .map(m => ({
+            id: m.id,
+            title: m.name,
+            target: '自訂',
+            type: m.mission_type?.name || '一般任務',
+            desc: m.detail || '',
+            isBackend: true
+        }));
 
     const handleCreateMission = async () => {
         if (!newTaskTitle) return showToast('請輸入任務名稱', 'error');
+        if (!newTaskDomainId) return showToast('請選擇任務領域', 'error');
+        if (!newTaskTypeId) return showToast('請選擇執行模式', 'error');
+        
         setIsSubmitting(true);
         try {
             const missionData = {
-                title: newTaskTitle,
                 name: newTaskTitle,
-                description: newTaskDesc,
-                category: newTaskCategory,
-                type: newTaskMode,
-                is_active: true
+                detail: newTaskDesc,
+                health_domain_id: parseInt(newTaskDomainId),
+                mission_type_id: parseInt(newTaskTypeId)
             };
             const createdMission = await managementApi.createMission(missionData);
-            const missionId = createdMission.id || createdMission.mission_id;
+            const missionId = createdMission.id;
 
             if (selectedFile && missionId) {
                 const formData = new FormData();
                 formData.append('file', selectedFile);
                 const assetData = await managementApi.createAsset(formData);
-                const assetId = assetData.id || assetData.asset_id;
+                const assetId = assetData.id;
 
                 if (assetId) {
                     await managementApi.createMissionDataRelation({
                         mission_id: missionId,
-                        data_id: assetId
+                        data_asset_id: assetId
                     });
                 }
             }
@@ -165,20 +176,22 @@ const TaskManager = () => {
 
             <div className="bg-white rounded-2xl shadow-sm border border-sky-100/50 overflow-hidden">
                 <div className="flex overflow-x-auto border-b border-sky-100/50 bg-sky-50/20">
-                    {categories.map((cat) => (
+                    {dynamicCategories.map((cat) => (
                         <button
                             key={cat.id}
-                            onClick={() => setActiveCategory(cat.id)}
+                            onClick={() => setActiveCategoryId(cat.id)}
                             className={`flex items-center space-x-2 px-6 py-4 font-bold text-sm transition-colors border-b-2 whitespace-nowrap cursor-pointer
-                ${activeCategory === cat.id
+                                ${activeCategoryId === cat.id
                                     ? `border-primary text-primary bg-primary/5`
                                     : 'border-transparent text-text/50 hover:bg-sky-50'
                                 }`}
                         >
-                            <span className={activeCategory === cat.id ? cat.color : ''}>{cat.icon}</span>
-                            <span>{cat.label}</span>
+                            <span>{cat.name}</span>
                         </button>
                     ))}
+                    {dynamicCategories.length === 0 && (
+                        <div className="px-6 py-4 text-sm text-text/40 italic">尚無動態分類資料</div>
+                    )}
                 </div>
 
                 <div className="p-4 border-b border-sky-100/50 flex flex-col sm:flex-row gap-4 justify-between">
@@ -245,7 +258,7 @@ const TaskManager = () => {
                                 <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                                     <Plus size={24} className="text-text/40 group-hover:text-primary transition-colors" />
                                 </div>
-                                <span className="font-medium text-sm">新增 {categories.find(c => c.id === activeCategory)?.label} 任務</span>
+                                <span className="font-medium text-sm">新增 {dynamicCategories.find(c => c.id === activeCategoryId)?.name || '任務'}</span>
                             </div>
                         </div>
                     )}
@@ -274,27 +287,29 @@ const TaskManager = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-bold text-text mb-1">任務類型 <span className="text-rose-500">*</span></label>
+                                    <label className="block text-sm font-bold text-text mb-1">任務領域 <span className="text-rose-500">*</span></label>
                                     <select 
-                                        value={newTaskCategory}
-                                        onChange={(e) => setNewTaskCategory(e.target.value)}
+                                        value={newTaskDomainId}
+                                        onChange={(e) => setNewTaskDomainId(e.target.value)}
                                         className="w-full px-4 py-2 border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
                                     >
-                                        <option>社會心理</option>
-                                        <option>肌少症</option>
-                                        <option>口腔保健</option>
+                                        <option value="">選擇領域...</option>
+                                        {dynamicCategories.map(cat => (
+                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-text mb-1">執行模式</label>
+                                    <label className="block text-sm font-bold text-text mb-1">執行模式 <span className="text-rose-500">*</span></label>
                                     <select 
-                                        value={newTaskMode}
-                                        onChange={(e) => setNewTaskMode(e.target.value)}
+                                        value={newTaskTypeId}
+                                        onChange={(e) => setNewTaskTypeId(e.target.value)}
                                         className="w-full px-4 py-2 border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
                                     >
-                                        <option>一般任務</option>
-                                        <option>VIVIFRAIL</option>
-                                        <option>撲克牌抽卡</option>
+                                        <option value="">選擇模式...</option>
+                                        {availableMissionTypes.map(type => (
+                                            <option key={type.id} value={type.id}>{type.name}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>

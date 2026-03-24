@@ -11,6 +11,19 @@ const PatientList = () => {
     const [loading, setLoading] = useState(true);
     const { showToast, requestConfirm } = useToast();
 
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [formData, setFormData] = useState({
+        username: '',
+        password: '',
+        display_name: '',
+        birthday: '',
+        gender_id: 1,
+        nation_id: '',
+        sarcopenia_level: 'D',
+        phone_number: '',
+        address: ''
+    });
+
     const fetchPatients = async () => {
         setLoading(true);
         try {
@@ -26,23 +39,38 @@ const PatientList = () => {
         fetchPatients();
     }, []);
 
-    const handleCreateUser = async () => {
-        const username = window.prompt("請輸入新病患的帳號 (username):", "test_user_01");
-        if (!username) return;
-        const displayName = window.prompt("請輸入新病患的姓名 (display_name):", "王小明");
-        if (!displayName) return;
-        const password = window.prompt("請輸入密碼 (password):", "123456");
-        if (!password) return;
-        
+    const handleCreateUser = async (e) => {
+        e.preventDefault();
         try {
             await managementApi.createUser({
-                username,
-                password,
-                display_name: displayName,
+                username: formData.username,
+                password: formData.password,
+                display_name: formData.display_name,
                 role_id: 3, // Role 3 = Patient
-                is_active: true
+                is_active: true,
+                details: {
+                    birthday: formData.birthday,
+                    gender_id: parseInt(formData.gender_id),
+                    nation_id: formData.nation_id,
+                    sarcopenia_level: formData.sarcopenia_level,
+                    phone_number: formData.phone_number,
+                    address: formData.address,
+                    points: 0
+                }
             });
             showToast('新增病患成功', 'success');
+            setShowCreateModal(false);
+            setFormData({
+                username: '',
+                password: '',
+                display_name: '',
+                birthday: '',
+                gender_id: 1,
+                nation_id: '',
+                sarcopenia_level: 'D',
+                phone_number: '',
+                address: ''
+            });
             fetchPatients();
         } catch (error) {
             showToast('新增病患失敗: ' + error.message, 'error');
@@ -63,7 +91,7 @@ const PatientList = () => {
     };
 
     const calculateAge = (birthday) => {
-        if (!birthday) return 'N/A';
+        if (!birthday) return '??';
         const birthDate = new Date(birthday);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -71,7 +99,7 @@ const PatientList = () => {
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
             age--;
         }
-        return age;
+        return age > 0 ? age : 0;
     };
 
     const getGradeColor = (grade) => {
@@ -97,7 +125,7 @@ const PatientList = () => {
                     <p className="text-text/60 mt-1">管理並追蹤長者的健康狀態與任務進度</p>
                 </div>
                 <button 
-                    onClick={handleCreateUser}
+                    onClick={() => setShowCreateModal(true)}
                     className="px-5 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors cursor-pointer shadow-sm flex items-center space-x-2"
                 >
                     <span>+ 新增個案</span>
@@ -105,7 +133,7 @@ const PatientList = () => {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-sky-100/50 overflow-hidden">
-                {/* Toolbar */}
+                {/* ... (toolbar and table remain same) ... */}
                 <div className="p-4 border-b border-sky-100/50 flex flex-col sm:flex-row gap-4 justify-between bg-sky-50/30">
                     <div className="relative w-full sm:w-80">
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -127,7 +155,6 @@ const PatientList = () => {
                     </div>
                 </div>
 
-                {/* Table */}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
@@ -159,7 +186,10 @@ const PatientList = () => {
                                         {patient.username}
                                     </td>
                                     <td className="py-4 px-6 text-text/70">
-                                        {patient.details?.gender?.name || '未知'} | {calculateAge(patient.details?.birthday)}歲
+                                        <span className="font-medium">{patient.details?.gender?.name === 'male' ? '男' : patient.details?.gender?.name === 'female' ? '女' : '未知'}</span>
+                                        <span className="mx-2 text-text/20">|</span>
+                                        <span className="font-bold text-primary">{calculateAge(patient.details?.birthday)}</span>
+                                        <span className="text-xs ml-0.5">歲</span>
                                     </td>
                                     <td className="py-4 px-6">
                                         <span className={`px-3 py-1 text-xs font-bold rounded-full border ${getGradeColor(patient.details?.sarcopenia_level)}`}>
@@ -171,7 +201,7 @@ const PatientList = () => {
                                             <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                                                 <div
                                                     className={`h-full rounded-full bg-primary`}
-                                                    style={{ width: `0%` }} // 進度計算邏輯待補，目前後端 User schema 未直接提供
+                                                    style={{ width: `0%` }} 
                                                 ></div>
                                             </div>
                                             <span className="text-xs font-medium text-text/70 w-8">0%</span>
@@ -180,7 +210,7 @@ const PatientList = () => {
                                     <td className="py-4 px-6 text-xs text-text/40 italic">
                                         尚未串接警示邏輯
                                     </td>
-                                    <td className="py-4 px-6 text-center">
+                                    <td className="py-4 px-6 text-center whitespace-nowrap">
                                         <button
                                             onClick={() => navigate(`/patients/${patient.id}`)}
                                             className="inline-flex items-center justify-center p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors cursor-pointer"
@@ -202,6 +232,148 @@ const PatientList = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Create Patient Modal */}
+            {showCreateModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-sky-100 animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-sky-100 bg-sky-50/50">
+                            <h3 className="text-xl font-bold text-primary">新增個案資料</h3>
+                            <p className="text-sm text-text/50 mt-1">請輸入病患的基本帳號與健康分級資訊</p>
+                        </div>
+                        
+                        <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">姓名 (Display Name)</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        placeholder="例如：王大明"
+                                        value={formData.display_name}
+                                        onChange={(e) => setFormData({...formData, display_name: e.target.value})}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">帳號 (Username)</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                                        placeholder="例如：user_01"
+                                        value={formData.username}
+                                        onChange={(e) => setFormData({...formData, username: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">登入密碼 (Password)</label>
+                                <input
+                                    required
+                                    type="password"
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    placeholder="建議 6 位數以上"
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">生日 (Birthday)</label>
+                                    <input
+                                        required
+                                        type="date"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={formData.birthday}
+                                        onChange={(e) => setFormData({...formData, birthday: e.target.value})}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">性別</label>
+                                    <select
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={formData.gender_id}
+                                        onChange={(e) => setFormData({...formData, gender_id: e.target.value})}
+                                    >
+                                        <option value={1}>男性</option>
+                                        <option value={2}>女性</option>
+                                        <option value={3}>其他</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">聯絡電話</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        placeholder="例如：0912345678"
+                                        value={formData.phone_number}
+                                        onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">居住地址</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        placeholder="居住縣市與街道"
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">肌少症分級</label>
+                                    <select
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={formData.sarcopenia_level}
+                                        onChange={(e) => setFormData({...formData, sarcopenia_level: e.target.value})}
+                                    >
+                                        <option value="A">A 級 (極需干預)</option>
+                                        <option value="B">B 級 (中度風險)</option>
+                                        <option value="C">C 級 (輕度風險)</option>
+                                        <option value="D">D 級 (健康正常)</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">身分證字號 (Nation ID)</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        placeholder="用於系統索引"
+                                        value={formData.nation_id}
+                                        onChange={(e) => setFormData({...formData, nation_id: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCreateModal(false)}
+                                    className="flex-1 py-3 px-4 border border-sky-200 text-text/60 rounded-xl font-bold hover:bg-sky-50 transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20"
+                                >
+                                    確認新增
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

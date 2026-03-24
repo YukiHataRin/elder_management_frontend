@@ -26,11 +26,24 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (username, password) => {
-    const data = await authApi.login(username, password);
-    localStorage.setItem('token', data.access_token);
-    const userData = await authApi.getMe();
-    setUser(userData);
-    return userData;
+    try {
+      const data = await authApi.login(username, password);
+      // V2 回傳結構確認: data.access_token
+      if (data && data.access_token) {
+        localStorage.setItem('token', data.access_token);
+        
+        // 稍微等待或確保 localStorage 寫入完成
+        // 有些瀏覽器 localStorage 操作是同步的，但在複雜請求下可能會有競爭
+        const userData = await authApi.getMe();
+        setUser(userData);
+        return userData;
+      } else {
+        throw new Error('Invalid login response');
+      }
+    } catch (error) {
+      localStorage.removeItem('token');
+      throw error;
+    }
   };
 
   const logout = () => {

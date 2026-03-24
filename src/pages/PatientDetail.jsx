@@ -256,21 +256,41 @@ const PatientDetail = () => {
                                 <User size={40} />
                             </div>
                             <h3 className="text-xl font-bold text-text">{patient.display_name}</h3>
-                            <p className="text-text/60">{details.gender?.name || '未知'} | {calculateAge(details.birthday)} 歲</p>
-                            <p className="text-xs text-text/40 mt-1">帳號: {patient.username}</p>
+                            <div className="flex items-center space-x-2 mt-1">
+                                <span className="text-text/60">{details.gender?.name === 'male' ? '男性' : details.gender?.name === 'female' ? '女性' : '未知'}</span>
+                                <span className="text-text/20">|</span>
+                                <span className="font-bold text-primary">{calculateAge(details.birthday)} 歲</span>
+                            </div>
+                            <p className="text-[10px] font-mono text-text/30 mt-2 uppercase tracking-wider">帳號: {patient.username}</p>
                         </div>
 
-                        <div className="space-y-4 text-sm">
+                        <div className="space-y-4 text-sm border-t border-sky-100/50 pt-6">
                             <div className="flex items-start space-x-3 text-text/80">
-                                <Phone size={16} className="text-primary mt-0.5" />
-                                <span>{details.phone_number || '未提供電話'}</span>
+                                <div className="p-1.5 bg-sky-50 rounded-lg text-primary">
+                                    <Phone size={14} />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[10px] font-bold text-text/40 uppercase">聯絡電話</p>
+                                    <p className="font-medium">{details.phone_number || '未提供'}</p>
+                                </div>
                             </div>
                             <div className="flex items-start space-x-3 text-text/80">
-                                <MapPin size={16} className="text-primary mt-0.5" />
-                                <span>{details.address || '未提供地址'}</span>
+                                <div className="p-1.5 bg-sky-50 rounded-lg text-primary">
+                                    <MapPin size={14} />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[10px] font-bold text-text/40 uppercase">居住地址</p>
+                                    <p className="font-medium text-xs leading-relaxed">{details.address || '未提供'}</p>
+                                </div>
                             </div>
-                            <div className="pt-4 border-t border-sky-100/50">
-                                <p className="text-text/70 italic">尚無健康背景備註</p>
+                            <div className="flex items-start space-x-3 text-text/80">
+                                <div className="p-1.5 bg-sky-50 rounded-lg text-primary">
+                                    <Activity size={14} />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[10px] font-bold text-text/40 uppercase">出生日期</p>
+                                    <p className="font-medium">{details.birthday || '未提供'}</p>
+                                </div>
                             </div>
                         </div>
 

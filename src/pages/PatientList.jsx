@@ -202,7 +202,8 @@ const PatientList = () => {
         return 'bg-sky-100 text-sky-700 border-sky-200';
     };
 
-    const [activeTab, setActiveTab] = useState('all'); // 'all', 'experimental', 'control', 'psychiatric', 'dental', 'sarcopenia'
+    const [activeTab, setActiveTab] = useState('all'); // 'all', 'experimental', 'control'
+    const [subFilter, setSubFilter] = useState('all'); // 'all', 'psychiatric', 'dental', 'sarcopenia'
 
     const filteredPatients = patients.filter(p => {
         const matchesSearch = p.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -210,11 +211,15 @@ const PatientList = () => {
         
         if (!matchesSearch) return false;
 
-        switch (activeTab) {
-            case 'experimental':
-                return p.role?.name === '實驗組';
-            case 'control':
-                return p.role?.name === '對照組';
+        // 第一層：組別過濾
+        const matchesTab = activeTab === 'all' || 
+                          (activeTab === 'experimental' && p.role?.name === '實驗組') ||
+                          (activeTab === 'control' && p.role?.name === '對照組');
+        
+        if (!matchesTab) return false;
+
+        // 第二層：特徵過濾
+        switch (subFilter) {
             case 'psychiatric':
                 return p.details?.is_psychiatric === true;
             case 'dental':
@@ -242,7 +247,8 @@ const PatientList = () => {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-sky-100/50 overflow-hidden">
-                <div className="px-4 pt-4 border-b border-sky-100/50 flex flex-wrap gap-x-4 bg-sky-50/10">
+                {/* 第一層標籤：組別 */}
+                <div className="px-4 pt-4 border-b border-sky-100/50 flex space-x-4 bg-sky-50/10">
                     <button 
                         onClick={() => setActiveTab('all')}
                         className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'all' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
@@ -264,26 +270,43 @@ const PatientList = () => {
                         對照組 ({patients.filter(p => p.role?.name === '對照組').length})
                         {activeTab === 'control' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
                     </button>
+                </div>
+
+                {/* 第二層標籤：健康特徵細分 */}
+                <div className="px-4 py-3 border-b border-sky-100/30 flex flex-wrap gap-2 bg-white">
+                    <span className="text-xs font-bold text-text/40 flex items-center mr-2 uppercase tracking-wider">特徵篩選:</span>
                     <button 
-                        onClick={() => setActiveTab('psychiatric')}
-                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'psychiatric' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                        onClick={() => setSubFilter('all')}
+                        className={`px-3 py-1 text-xs font-bold rounded-full border transition-all cursor-pointer ${subFilter === 'all' ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-text/50 border-sky-100 hover:border-sky-300'}`}
                     >
-                        心理問題 ({patients.filter(p => p.details?.is_psychiatric === true).length})
-                        {activeTab === 'psychiatric' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                        全部特徵
                     </button>
                     <button 
-                        onClick={() => setActiveTab('dental')}
-                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'dental' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                        onClick={() => setSubFilter('psychiatric')}
+                        className={`px-3 py-1 text-xs font-bold rounded-full border transition-all cursor-pointer ${subFilter === 'psychiatric' ? 'bg-rose-500 text-white border-rose-500 shadow-sm' : 'bg-white text-text/50 border-sky-100 hover:border-rose-200'}`}
                     >
-                        口腔保健 ({patients.filter(p => p.details?.is_dental === true).length})
-                        {activeTab === 'dental' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                        心理問題 ({patients.filter(p => {
+                            const inGroup = activeTab === 'all' || (activeTab === 'experimental' && p.role?.name === '實驗組') || (activeTab === 'control' && p.role?.name === '對照組');
+                            return inGroup && p.details?.is_psychiatric === true;
+                        }).length})
                     </button>
                     <button 
-                        onClick={() => setActiveTab('sarcopenia')}
-                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'sarcopenia' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                        onClick={() => setSubFilter('dental')}
+                        className={`px-3 py-1 text-xs font-bold rounded-full border transition-all cursor-pointer ${subFilter === 'dental' ? 'bg-sky-500 text-white border-sky-500 shadow-sm' : 'bg-white text-text/50 border-sky-100 hover:border-sky-300'}`}
                     >
-                        肌少症風險 ({patients.filter(p => p.details?.sarcopenia_level && ['A', 'B', 'C'].includes(p.details.sarcopenia_level)).length})
-                        {activeTab === 'sarcopenia' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                        口腔保健 ({patients.filter(p => {
+                            const inGroup = activeTab === 'all' || (activeTab === 'experimental' && p.role?.name === '實驗組') || (activeTab === 'control' && p.role?.name === '對照組');
+                            return inGroup && p.details?.is_dental === true;
+                        }).length})
+                    </button>
+                    <button 
+                        onClick={() => setSubFilter('sarcopenia')}
+                        className={`px-3 py-1 text-xs font-bold rounded-full border transition-all cursor-pointer ${subFilter === 'sarcopenia' ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-white text-text/50 border-sky-100 hover:border-amber-200'}`}
+                    >
+                        肌少症風險 ({patients.filter(p => {
+                            const inGroup = activeTab === 'all' || (activeTab === 'experimental' && p.role?.name === '實驗組') || (activeTab === 'control' && p.role?.name === '對照組');
+                            return inGroup && p.details?.sarcopenia_level && ['A', 'B', 'C'].includes(p.details.sarcopenia_level);
+                        }).length})
                     </button>
                 </div>
 

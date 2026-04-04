@@ -1,9 +1,132 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Camera, Heart, Star, Send, Loader2, UserPlus, UserMinus } from 'lucide-react';
+import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Camera, Heart, Star, Send, Loader2, UserPlus, UserMinus, FileText } from 'lucide-react';
 import { managementApi } from '../api/management';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { apiFetchBlob } from '../api/client'; // Import apiFetchBlob
+
+// Helper component to display mission return media
+const MissionMediaDisplay = ({ assetId, mimeType, assetData }) => {
+    const [mediaUrl, setMediaUrl] = useState(null);
+    const [loadingMedia, setLoadingMedia] = useState(true);
+    const [errorMedia, setErrorMedia] = useState(false);
+    const [fetchedMimeType, setFetchedMimeType] = useState('');
+
+    useEffect(() => {
+        let objectUrl = null;
+        
+        const fetchMedia = async () => {
+            setLoadingMedia(true);
+            setErrorMedia(false);
+            try {
+                // 1. 確定檔案路徑 (urlPath)
+                let urlPath = assetData?.url || (typeof assetId === 'string' && (assetId.includes('/') || assetId.includes('\\')) ? assetId : null);
+                
+                // 如果只有數字 ID，必須先請求資產資訊以獲取 URL
+                if (!urlPath && assetId) {
+                    try {
+                        const assetInfo = await managementApi.getAsset(assetId);
+                        urlPath = assetInfo.url;
+                    } catch (e) {
+                        console.error('Failed to get asset info:', e);
+                        throw e;
+                    }
+                }
+
+                if (!urlPath) {
+                    setLoadingMedia(false);
+                    return;
+                }
+
+                // 2. 透過 /assets/url/ 獲取實際檔案 Blob
+                // 使用 encodeURIComponent 確保路徑中的斜線被正確處理
+                const fetchPath = `/assets/url/${encodeURIComponent(urlPath)}`;
+                const blob = await apiFetchBlob(fetchPath);
+                
+                if (blob.type && blob.type !== 'application/octet-stream') {
+                    setFetchedMimeType(blob.type);
+                }
+                
+                objectUrl = URL.createObjectURL(blob);
+                setMediaUrl(objectUrl);
+            } catch (error) {
+                console.error('Failed to fetch media asset:', error);
+                setErrorMedia(true);
+            } finally {
+                setLoadingMedia(false);
+            }
+        };
+
+        fetchMedia();
+
+        return () => {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [assetId, assetData]);
+
+    if (loadingMedia) {
+        return (
+            <div className="flex items-center justify-center h-24 w-full bg-slate-50 text-slate-400 rounded-lg">
+                <Loader2 size={20} className="animate-spin mr-2" /> 載入中...
+            </div>
+        );
+    }
+
+    if (errorMedia) {
+        return (
+            <div className="flex items-center justify-center h-24 w-full bg-rose-50 text-rose-400 rounded-lg">
+                <XCircle size={20} className="mr-2" /> 載入失敗
+            </div>
+        );
+    }
+
+    if (!mediaUrl) return null;
+
+    // 取得路徑與副檔名
+    const path = assetData?.url || assetId || '';
+    const ext = typeof path === 'string' ? path.split('.').pop().toLowerCase() : '';
+    const currentMime = (fetchedMimeType || mimeType || '').toLowerCase();
+    
+    // 類型判斷
+    const isImage = currentMime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+    const isVideo = currentMime.startsWith('video/') || ['mp4', 'webm', 'ogg', 'mov'].includes(ext);
+    const isAudio = currentMime.startsWith('audio/') || ['mp3', 'wav', 'aac', 'm4a'].includes(ext);
+
+    if (isImage) {
+        return <img src={mediaUrl} alt="任務成果" className="max-h-60 w-auto rounded-lg shadow-sm border border-slate-200 object-contain mx-auto" />;
+    } else if (isVideo) {
+        return (
+            <video controls className="max-h-60 w-auto rounded-lg shadow-sm border border-slate-200 mx-auto">
+                <source src={mediaUrl} type={currentMime.startsWith('video/') ? currentMime : `video/${ext || 'mp4'}`} />
+                您的瀏覽器不支援影片播放。
+            </video>
+        );
+    } else if (isAudio) {
+        return (
+            <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase flex items-center gap-1">
+                    <Activity size={10} /> 錄音成果回傳
+                </span>
+                <audio controls className="w-full h-10">
+                    <source src={mediaUrl} type={currentMime.startsWith('audio/') ? currentMime : `audio/${ext || 'mpeg'}`} />
+                </audio>
+            </div>
+        );
+    } else {
+        const fileName = typeof path === 'string' ? path.split('/').pop() : `file_${assetId}`;
+        return (
+            <a href={mediaUrl} download={fileName} className="flex flex-col items-center justify-center p-4 bg-primary/5 text-primary rounded-xl border border-primary/20 hover:bg-primary/10 transition-colors w-full">
+                <FileText size={24} className="mb-2" />
+                <span className="font-medium text-center truncate w-full px-2">{fileName}</span>
+                <span className="text-[10px] opacity-60 mt-1 uppercase">{ext || 'FILE'}</span>
+            </a>
+        );
+    }
+};
+
 
 const PatientDetail = () => {
     const { id } = useParams();
@@ -11,6 +134,7 @@ const PatientDetail = () => {
     const { isAdmin } = useAuth();
     const { showToast, requestConfirm } = useToast();
     const [activeTab, setActiveTab] = useState('tasks');
+    const [taskSubTab, setTaskSubTab] = useState('assigned'); // 'assigned' or 'history'
     const [patient, setPatient] = useState(null);
     const [loading, setLoading] = useState(true);
     
@@ -21,6 +145,9 @@ const PatientDetail = () => {
     
     // Mission states
     const [assignedMissions, setAssignedMissions] = useState([]);
+    const [missionLogs, setMissionLogs] = useState([]);
+    const [missionReturns, setMissionReturns] = useState([]);
+    const [isLogsLoading, setIsLogsLoading] = useState(false);
 
     const [isAddMissionModalOpen, setIsAddMissionModalOpen] = useState(false);
     const [allMissions, setAllMissions] = useState([]);
@@ -64,6 +191,23 @@ const PatientDetail = () => {
         }
     };
 
+    const fetchLogs = async () => {
+        setIsLogsLoading(true);
+        try {
+            const [userLogs, userReturns] = await Promise.all([
+                managementApi.getMissionLogs(id),
+                managementApi.getMissionReturns(id)
+            ]);
+
+            setMissionLogs(userLogs || []);
+            setMissionReturns(userReturns || []);
+        } catch (error) {
+            console.error('Failed to fetch mission logs:', error);
+        } finally {
+            setIsLogsLoading(false);
+        }
+    };
+
     const fetchAllMissions = async () => {
         try {
             const data = await managementApi.getMissions();
@@ -77,6 +221,7 @@ const PatientDetail = () => {
         fetchDetail();
         fetchManagers();
         fetchMissions();
+        fetchLogs();
         fetchAllMissions();
     }, [id]);
 
@@ -121,13 +266,19 @@ const PatientDetail = () => {
         if (selectedMissionIds.length === 0) return showToast('請選擇至少一項任務', 'error');
         setIsSubmittingMissions(true);
         try {
-            await Promise.all(selectedMissionIds.map(mId => 
-                managementApi.assignMission({
+            await Promise.all(selectedMissionIds.map(async (mId) => {
+                // 1. 指派任務
+                await managementApi.assignMission({
                     mission_id: mId,
                     user_id: parseInt(id),
                     is_compulsory: isCompulsory
-                })
-            ));
+                });
+                
+                // 2. 如果是必修，自動幫病患開啟/領取該任務起始狀態
+                if (isCompulsory) {
+                    await managementApi.createMissionLogForUser(mId, parseInt(id));
+                }
+            }));
             showToast('任務派發成功！', 'success');
             setIsAddMissionModalOpen(false);
             fetchMissions(); // Re-fetch assigned missions
@@ -183,6 +334,10 @@ const PatientDetail = () => {
         }
     };
 
+    const getMissionDetails = (missionId) => {
+        return allMissions.find(m => String(m.id || m.mission_id) === String(missionId));
+    };
+
     const calculateAge = (birthday) => {
         if (!birthday) return 'N/A';
         const birthDate = new Date(birthday);
@@ -193,6 +348,18 @@ const PatientDetail = () => {
             age--;
         }
         return age;
+    };
+
+    const formatLogDate = (dateString) => {
+        if (!dateString) return '';
+        const d = new Date(dateString);
+        return d.toLocaleDateString('zh-TW', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
     };
 
     if (loading) {
@@ -402,144 +569,279 @@ const PatientDetail = () => {
 
                         <div className="p-6 relative">
                             {activeTab === 'tasks' && (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center mb-4 border-b border-sky-100 pb-2">
-                                        <h3 className="font-bold text-lg text-primary flex items-center space-x-2">
-                                            <span>目前指派的任務</span>
-                                            <span className="text-sm font-bold bg-sky-100 text-primary px-2 py-0.5 rounded-full">{assignedMissions.length}</span>
-                                        </h3>
-                                        
-                                        {assignedMissions.length > 0 && (
-                                            isEditingMissions ? (
-                                                <div className="flex items-center space-x-3">
-                                                    <button 
-                                                        onClick={toggleSelectAllMissions}
-                                                        className="text-sm text-primary font-medium hover:underline cursor-pointer"
-                                                    >
-                                                        {selectedEditMissionIds.length === assignedMissions.length ? '取消全選' : '全選'}
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => {
-                                                            setIsEditingMissions(false);
-                                                            setSelectedEditMissionIds([]);
-                                                        }}
-                                                        className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors cursor-pointer"
-                                                    >
-                                                        完成編輯
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => setIsEditingMissions(true)}
-                                                    className="px-3 py-1.5 text-primary bg-primary/10 hover:bg-primary/20 rounded-lg text-sm font-bold transition-colors cursor-pointer border border-primary/20"
-                                                >
-                                                    批量編輯
-                                                </button>
-                                            )
-                                        )}
-                                    </div>
+                            <div className="space-y-4">
+                                <div className="flex mb-4">
+                                    <button
+                                        className={`flex-1 py-2 text-center text-sm font-medium rounded-l-lg transition-colors ${taskSubTab === 'assigned' ? 'bg-primary text-white shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                                        onClick={() => setTaskSubTab('assigned')}
+                                    >
+                                        待執行任務
+                                    </button>
+                                    <button
+                                        className={`flex-1 py-2 text-center text-sm font-medium rounded-r-lg transition-colors ${taskSubTab === 'history' ? 'bg-primary text-white shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                                        onClick={() => setTaskSubTab('history')}
+                                    >
+                                        歷史執行紀錄
+                                    </button>
+                                </div>
 
-                                    {assignedMissions.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-10 text-text/40 bg-sky-50/30 rounded-xl border-2 border-dashed border-sky-100">
-                                            <Activity size={48} className="mb-4 opacity-50 text-sky-300" />
-                                            <p>此病患尚未被指派任何任務</p>
+                                {taskSubTab === 'assigned' && (
+                                    <>
+                                        <div className="flex justify-between items-center mb-4 border-b border-sky-100 pb-2">
+                                            <h3 className="font-bold text-lg text-primary flex items-center space-x-2">
+                                                <span>目前指派的任務</span>
+                                                <span className="text-sm font-bold bg-sky-100 text-primary px-2 py-0.5 rounded-full">{assignedMissions.length}</span>
+                                            </h3>
+
+                                            {assignedMissions.length > 0 && (
+                                                isEditingMissions ? (
+                                                    <div className="flex items-center space-x-3">
+                                                        <button 
+                                                            onClick={toggleSelectAllMissions}
+                                                            className="text-sm text-primary font-medium hover:underline cursor-pointer"
+                                                        >
+                                                            {selectedEditMissionIds.length === assignedMissions.length ? '取消全選' : '全選'}
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                setIsEditingMissions(false);
+                                                                setSelectedEditMissionIds([]);
+                                                            }}
+                                                            className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors cursor-pointer"
+                                                        >
+                                                            完成編輯
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => setIsEditingMissions(true)}
+                                                        className="px-3 py-1.5 text-primary bg-primary/10 hover:bg-primary/20 rounded-lg text-sm font-bold transition-colors cursor-pointer border border-primary/20"
+                                                    >
+                                                        批量編輯
+                                                    </button>
+                                                )
+                                            )}
                                         </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-16">
-                                            {assignedMissions.map((assignment, idx) => (
-                                                <div key={idx} 
-                                                     onClick={() => isEditingMissions && toggleEditMission(assignment.mission_id)}
-                                                     className={`bg-white p-4 rounded-xl border shadow-sm relative overflow-hidden transition-all ${
-                                                        isEditingMissions ? 'cursor-pointer hover:border-primary/50' : ''
-                                                     } ${selectedEditMissionIds.includes(assignment.mission_id) ? 'border-primary ring-1 ring-primary/30 bg-primary/5' : 'border-sky-100'}`}
-                                                >
-                                                    {assignment.is_compulsory && (
-                                                        <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
-                                                            必修推播
-                                                        </div>
-                                                    )}
-                                                    <div className="flex items-start space-x-3">
-                                                        {isEditingMissions && (
-                                                            <div className="pt-1">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    className="w-4 h-4 text-primary rounded focus:ring-primary/20 cursor-pointer pointer-events-none"
-                                                                    checked={selectedEditMissionIds.includes(assignment.mission_id)}
-                                                                    readOnly
-                                                                />
+
+                                        {assignedMissions.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-10 text-text/40 bg-sky-50/30 rounded-xl border-2 border-dashed border-sky-100">
+                                                <Activity size={48} className="mb-4 opacity-50 text-sky-300" />
+                                                <p>此病患尚未被指派任何任務</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-16">
+                                                {assignedMissions.map((assignment, idx) => (
+                                                    <div key={idx} 
+                                                        onClick={() => isEditingMissions && toggleEditMission(assignment.mission_id)}
+                                                        className={`bg-white p-4 rounded-xl border shadow-sm relative overflow-hidden transition-all ${
+                                                            isEditingMissions ? 'cursor-pointer hover:border-primary/50' : ''
+                                                        } ${selectedEditMissionIds.includes(assignment.mission_id) ? 'border-primary ring-1 ring-primary/30 bg-primary/5' : 'border-sky-100'}`}
+                                                    >
+                                                        {assignment.is_compulsory && (
+                                                            <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
+                                                                必修推播
                                                             </div>
                                                         )}
-                                                        <div className="flex-1">
-                                                            <div className="flex justify-between items-start mb-2">
-                                                                <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                                                    {assignment.mission?.type || '一般任務'}
-                                                                </span>
-                                                                {!isEditingMissions && (
-                                                                    <button 
-                                                                        onClick={async (e) => {
-                                                                            e.stopPropagation();
-                                                                            if(await requestConfirm('確定要取消指派此任務給該病患嗎？')) {
-                                                                                try {
-                                                                                    await managementApi.deleteMissionElective(assignment.mission_id, id);
-                                                                                    fetchMissions();
-                                                                                    showToast('取消指派成功', 'success');
-                                                                                } catch(err) { showToast('取消指派失敗: ' + err.message, 'error'); }
-                                                                            }
-                                                                        }}
-                                                                        className="text-text/30 hover:text-rose-500 transition-colors p-1"
-                                                                        title="取消指派此任務"
-                                                                    >
-                                                                        <XCircle size={14} />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                            <h4 className="font-bold text-text mb-1">{assignment.mission?.title || assignment.mission?.name || '未知任務'}</h4>
-                                                            <p className="text-xs text-text/60 line-clamp-2 mb-3">{assignment.mission?.description || assignment.mission?.desc || '沒有描述'}</p>
-                                                            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                                                                <span className="text-primary font-medium bg-primary/10 px-2 py-1 rounded">未執行</span>
-                                                                <span className="text-text/40">任務 ID: {assignment.mission_id}</span>
+                                                        <div className="flex items-start space-x-3">
+                                                            {isEditingMissions && (
+                                                                <div className="pt-1">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        className="w-4 h-4 text-primary rounded focus:ring-primary/20 cursor-pointer pointer-events-none"
+                                                                        checked={selectedEditMissionIds.includes(assignment.mission_id)}
+                                                                        readOnly
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-1">
+                                                                <div className="flex justify-between items-start mb-2">
+                                                                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                                        {assignment.mission?.type || '一般任務'}
+                                                                    </span>
+                                                                    {!isEditingMissions && (
+                                                                        <button 
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                if(await requestConfirm('確定要取消指派此任務給該病患嗎？')) {
+                                                                                    try {
+                                                                                        await managementApi.deleteMissionElective(assignment.mission_id, id);
+                                                                                        fetchMissions();
+                                                                                        showToast('取消指派成功', 'success');
+                                                                                    } catch(err) { showToast('取消指派失敗: ' + err.message, 'error'); }
+                                                                                }
+                                                                            }}
+                                                                            className="text-text/30 hover:text-rose-500 transition-colors p-1"
+                                                                            title="取消指派此任務"
+                                                                        >
+                                                                            <XCircle size={14} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                <h4 className="font-bold text-text mb-1">{assignment.mission?.title || assignment.mission?.name || '未知任務'}</h4>
+                                                                <p className="text-xs text-text/60 line-clamp-2 mb-3">{assignment.mission?.description || assignment.mission?.desc || '沒有描述'}</p>
+                                                                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                                                                    <span className="text-primary font-medium bg-primary/10 px-2 py-1 rounded">未執行</span>
+                                                                    <span className="text-text/40">任務 ID: {assignment.mission_id}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                ))}
+                                            </div>
+                                        )}
 
-                                    {/* Batch Action Bar */}
-                                    {isEditingMissions && (
-                                        <div className="absolute bottom-6 left-6 right-6 bg-slate-800 text-white p-3 rounded-xl shadow-lg flex items-center justify-between animate-fade-in z-10">
-                                            <div className="text-sm font-bold px-2">
-                                                已選取 <span className="text-primary-light text-lg px-1">{selectedEditMissionIds.length}</span> 項
+                                        {/* Batch Action Bar */}
+                                        {isEditingMissions && (
+                                            <div className="absolute bottom-6 left-6 right-6 bg-slate-800 text-white p-3 rounded-xl shadow-lg flex items-center justify-between animate-fade-in z-10">
+                                                <div className="text-sm font-bold px-2">
+                                                    已選取 <span className="text-primary-light text-lg px-1">{selectedEditMissionIds.length}</span> 項
+                                                </div>
+                                                <div className="flex space-x-2">
+                                                    <button 
+                                                        onClick={() => handleBatchProcess('elective')}
+                                                        disabled={selectedEditMissionIds.length === 0 || isBatchProcessing}
+                                                        className="px-3 py-1.5 text-sm font-medium bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50"
+                                                    >
+                                                        設為選修
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleBatchProcess('compulsory')}
+                                                        disabled={selectedEditMissionIds.length === 0 || isBatchProcessing}
+                                                        className="px-3 py-1.5 text-sm font-medium bg-cta hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
+                                                    >
+                                                        設為必修
+                                                    </button>
+                                                    <div className="w-px bg-slate-600 mx-1"></div>
+                                                    <button 
+                                                        onClick={() => handleBatchProcess('delete')}
+                                                        disabled={selectedEditMissionIds.length === 0 || isBatchProcessing}
+                                                        className="px-3 py-1.5 text-sm font-medium bg-rose-500 hover:bg-rose-600 rounded-lg transition-colors text-white disabled:opacity-50 flex items-center space-x-1"
+                                                    >
+                                                        {isBatchProcessing ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                                                        <span>批量刪除</span>
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="flex space-x-2">
-                                                <button 
-                                                    onClick={() => handleBatchProcess('elective')}
-                                                    disabled={selectedEditMissionIds.length === 0 || isBatchProcessing}
-                                                    className="px-3 py-1.5 text-sm font-medium bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50"
-                                                >
-                                                    設為選修
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleBatchProcess('compulsory')}
-                                                    disabled={selectedEditMissionIds.length === 0 || isBatchProcessing}
-                                                    className="px-3 py-1.5 text-sm font-medium bg-cta hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50"
-                                                >
-                                                    設為必修
-                                                </button>
-                                                <div className="w-px bg-slate-600 mx-1"></div>
-                                                <button 
-                                                    onClick={() => handleBatchProcess('delete')}
-                                                    disabled={selectedEditMissionIds.length === 0 || isBatchProcessing}
-                                                    className="px-3 py-1.5 text-sm font-medium bg-rose-500 hover:bg-rose-600 rounded-lg transition-colors text-white disabled:opacity-50 flex items-center space-x-1"
-                                                >
-                                                    {isBatchProcessing ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-                                                    <span>批量刪除</span>
-                                                </button>
-                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                {taskSubTab === 'history' && (
+                                    <>
+                                        <div className="flex justify-between items-center mb-4 border-b border-sky-100 pb-2">
+                                            <h3 className="font-bold text-lg text-primary flex items-center space-x-2">
+                                                <span>歷史執行紀錄</span>
+                                                <span className="text-sm font-bold bg-sky-100 text-primary px-2 py-0.5 rounded-full">{missionLogs.length}</span>
+                                            </h3>
                                         </div>
-                                    )}
-                                </div>
+                                        {isLogsLoading ? (
+                                            <div className="flex flex-col items-center justify-center py-10 text-primary">
+                                                <Loader2 size={32} className="animate-spin mb-3" />
+                                                <p>載入執行紀錄中...</p>
+                                            </div>
+                                        ) : missionLogs.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-10 text-text/40 bg-sky-50/30 rounded-xl border-2 border-dashed border-sky-100">
+                                                <FileText size={48} className="mb-4 opacity-50 text-sky-300" />
+                                                <p>此病患尚未有任何任務執行紀錄</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {missionLogs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(log => {
+                                                    const mission = getMissionDetails(log.mission_id);
+                                                    const relevantReturns = missionReturns.filter(ret => ret.mission_log_id === log.id);
+
+                                                    return (
+                                                        <div key={log.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                                    {mission?.health_domain?.name || '未知領域'} - {mission?.mission_type?.name || '未知類型'}
+                                                                </span>
+                                                                <span className="text-xs text-text/50">{formatLogDate(log.created_at)}</span>
+                                                            </div>
+                                                            {mission?.return_types?.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                    <span className="text-[9px] text-text/40 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 italic">需回傳：</span>
+                                                                    {mission.return_types.map((rt, idx) => (
+                                                                        <span key={idx} className="text-[9px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100 font-medium">
+                                                                            {rt.file_type?.name}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            <h4 className="font-bold text-text text-lg">{mission?.name || '未知任務'}</h4>
+                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-2">
+                                                                <div className="bg-sky-50/50 p-2 rounded-lg border border-sky-100/50">
+                                                                    <p className="text-[10px] text-text/50 block">期待度</p>
+                                                                    <span className="font-bold text-primary">{log.expectation_score || 'N/A'}</span> <span className="text-[10px] text-text/40">/ 5</span>
+                                                                </div>
+                                                                <div className="bg-sky-50/50 p-2 rounded-lg border border-sky-100/50">
+                                                                    <p className="text-[10px] text-text/50 block">滿意度</p>
+                                                                    <span className="font-bold text-primary">{log.satisfaction_score || 'N/A'}</span> <span className="text-[10px] text-text/40">/ 5</span>
+                                                                </div>
+                                                                <div className="bg-sky-50/50 p-2 rounded-lg border border-sky-100/50">
+                                                                    <p className="text-[10px] text-text/50 block">困難度</p>
+                                                                    <span className="font-bold text-primary">{log.difficulty_score || 'N/A'}</span> <span className="text-[10px] text-text/40">/ 5</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex justify-between items-center text-xs border-t border-slate-50 pt-2">
+                                                                <p className="text-text/70">狀態: 
+                                                                    <span className={`font-bold ml-1 ${log.mission_status_id === 2 ? 'text-cta' : log.mission_status_id === 3 ? 'text-blue-500' : 'text-orange-500'}`}>
+                                                                    {log.mission_status_id === 2 ? '已完成' : log.mission_status_id === 3 ? '進行中' : '未完成'}
+                                                                    </span>
+                                                                </p>
+                                                                <div className="text-right text-[10px] text-text/40">
+                                                                    <p>指派: {formatLogDate(log.assigned_at)}</p>
+                                                                    {log.updated_at && log.updated_at !== log.assigned_at && <p>更新: {formatLogDate(log.updated_at)}</p>}
+                                                                </div>
+                                                            </div>
+                                                            {log.note && (
+                                                                <div className="bg-slate-50 p-3 rounded-lg text-sm text-text/80 border border-slate-100">
+                                                                    個管師備註：{log.note}
+                                                                </div>
+                                                            )}
+                                                            {relevantReturns.length > 0 && (
+                                                                <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                                                                    <p className="text-sm font-bold text-text/80">成果回傳：</p>
+                                                                    <div className="grid grid-cols-2 gap-3">
+                                                                        {relevantReturns.map((ret, rIdx) => {
+                                                                            const hasFile = ret.file_path || ret.data_asset_id || ret.data_asset;
+                                                                            return (
+                                                                                <div key={ret.id || rIdx} className={`${hasFile ? 'border border-slate-100 rounded-lg p-2 flex flex-col items-center' : 'col-span-2 bg-slate-50 p-3 rounded-lg border border-slate-100'}`}>
+                                                                                    {hasFile ? (
+                                                                                        <>
+                                                                                            <MissionMediaDisplay 
+                                                                                                assetId={ret.file_path || ret.data_asset_id} 
+                                                                                                mimeType={ret.extension || ret.mime_type || ret.file_type?.name}
+                                                                                                assetData={ret.data_asset}
+                                                                                            />
+                                                                                            {ret.note && <p className="text-xs text-text/60 mt-2 text-center italic">「{ret.note}」</p>}
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <div className="flex items-start space-x-2">
+                                                                                            <div className="bg-primary/10 p-1.5 rounded-md text-primary mt-0.5">
+                                                                                                <FileText size={14} />
+                                                                                            </div>
+                                                                                            <div>
+                                                                                                <p className="text-[10px] text-text/40 font-bold uppercase mb-1">文字回傳內容</p>
+                                                                                                <p className="text-sm text-text/80 leading-relaxed font-medium">{ret.note || '無文字描述'}</p>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                             )}
                             {activeTab === 'health' && (
                                 <div className="flex flex-col items-center justify-center py-10 text-text/40">

@@ -1,0 +1,5 @@
+登入成功
+嘗試下載: https://api.eldercare.fclinlab.com/api/v2/assets/url/uploads%2F20260330124953_%E8%9E%A2%E5%B9%95%E9%8C%84%E8%A3%BD%202025-02-06%20145622.mp4
+狀態碼: 200
+成功拿到前 8KB 的 chunk，大小 8192 bytes
+下載邏輯驗證成功

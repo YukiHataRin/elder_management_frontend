@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch, apiFetchBlob } from './client';
 
 export const managementApi = {
   // --- 使用者管理 ---
@@ -72,6 +72,10 @@ export const managementApi = {
 
   // --- 任務管理 (V2) ---
 
+  // 取得實體檔案並以 Blob 格式回傳
+  getAssetFile: (urlIn) => apiFetchBlob(`/assets/url/${encodeURIComponent(urlIn)}`),
+
+
   // 取得所有任務清單
   getMissions: () => apiFetch('/management/missions'),
 
@@ -102,39 +106,63 @@ export const managementApi = {
   }),
 
   // 更新任務指派屬性 (例如: 是否必修)
-  updateMissionElective: (missionId, userId, isCompulsory) => 
+  updateMissionElective: (missionId, userId, isCompulsory) =>
     apiFetch(`/management/missions/elective/mission/${missionId}/user/${userId}?is_compulsory=${isCompulsory}`, {
       method: 'PUT',
     }),
 
   // 刪除特定使用者的任務指派紀錄
-  deleteMissionElective: (missionId, userId) => 
+  deleteMissionElective: (missionId, userId) =>
     apiFetch(`/management/missions/elective/mission/${missionId}/user/${userId}`, {
       method: 'DELETE',
     }),
 
+  // 放行指派必修任務時，自動代替使用者建立起始任務日誌狀態
+  createMissionLogForUser: (missionId, userId) =>
+    apiFetch(`/management/missions/elective/mission/${missionId}/user/${userId}/logs`, {
+      method: 'POST',
+    }),
+
   // --- 任務執行監看 (V2 New) ---
 
-  // 取得任務執行日誌 (查看病患是否完成、評分等)
-  getMissionLogs: () => apiFetch('/management/missions/logs'),
+  // 取得特定病患任務執行日誌 (查看病患是否完成、評分等)
+  getMissionLogs: (userId) => apiFetch(`/management/missions/logs/users/${userId}`),
 
-  // 取得病患回傳的成果檔案 (查看照片、影片成果)
-  getMissionReturns: () => apiFetch('/management/missions/logs/data'),
+  // 取得特定病患回傳的成果檔案 (查看照片、影片成果)
+  getMissionReturns: (userId) => apiFetch(`/management/missions/logs/data/users/${userId}`),
 
-  // --- 任務資產關聯 ---
+  // 取的所有可用成果回傳的檔案類型字典
+  getFileTypes: () => apiFetch(`/management/missions/logs/data/types`),
+
+  // --- 任務資產與類型綁定關聯 ---
 
   // 取得所有任務與資產的關聯列表
   getMissionDataRelations: () => apiFetch('/management/missions/data'),
 
-  // 將資料資產與任務建立連結
+  // 將資料資產與任務建立連結 (教學任務影片/圖片)
   createMissionDataRelation: (data) => apiFetch('/management/missions/data', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
 
   // 刪除特定任務與資產的連結
-  deleteMissionDataRelation: (missionId, assetId) => 
+  deleteMissionDataRelation: (missionId, assetId) =>
     apiFetch(`/management/missions/data/mission/${missionId}/data/${assetId}`, {
+      method: 'DELETE',
+    }),
+
+  // 取得所有任務與允許的檔案類型拘束列表
+  getMissionReturnTypeRelations: () => apiFetch('/management/missions/data/type'),
+
+  // 為特定任務綁定允許提交的檔案類型
+  createMissionReturnTypeRelation: (data) => apiFetch('/management/missions/data/type', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 放棄特定任務綁定的特定檔案類型拘束
+  deleteMissionReturnTypeRelation: (missionId, fileTypeId) =>
+    apiFetch(`/management/missions/data/mission/${missionId}/type/${fileTypeId}`, {
       method: 'DELETE',
     }),
 };
@@ -144,7 +172,7 @@ export const authApi = {
     const params = new URLSearchParams();
     params.append('username', username);
     params.append('password', password);
-    
+
     // V2 登入路徑: /auth/login
     const response = await fetch('https://api.eldercare.fclinlab.com/api/v2/auth/login', {
       method: 'POST',
@@ -153,15 +181,15 @@ export const authApi = {
       },
       body: params,
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || 'Login failed');
     }
-    
+
     return response.json();
   },
-  
+
   // V2 User Info: /app/me
   getMe: () => apiFetch('/app/me'),
 };

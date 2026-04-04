@@ -24,13 +24,38 @@ const PatientList = () => {
         address: ''
     });
 
+    const [managers, setManagers] = useState([]);
+    const [missionLogs, setMissionLogs] = useState([]);
+    const [assignedMissions, setAssignedMissions] = useState([]);
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [assignTargetPatient, setAssignTargetPatient] = useState(null);
+    const [selectedManagerId, setSelectedManagerId] = useState('');
+
     const fetchPatients = async () => {
         setLoading(true);
         try {
-            const data = await managementApi.getPatients();
-            setPatients(data);
+            const [patientsData, managersData, missionsData] = await Promise.all([
+                managementApi.getPatients(),
+                managementApi.getBackendUsers(2),
+                managementApi.getMissionsElective()
+            ]);
+            
+            setPatients(patientsData || []);
+            setManagers(managersData || []);
+            setAssignedMissions(missionsData || []);
+
+            // Iteratively fetch mission logs for each patient
+            if (patientsData && patientsData.length > 0) {
+                const logsPromises = patientsData.map(p => 
+                    managementApi.getMissionLogs(p.id).catch(() => [])
+                );
+                const logsDataArray = await Promise.all(logsPromises);
+                setMissionLogs(logsDataArray.flat());
+            } else {
+                setMissionLogs([]);
+            }
         } catch (error) {
-            console.error('Failed to fetch patients:', error);
+            console.error('Failed to fetch data:', error);
         }
         setLoading(false);
     };
@@ -38,6 +63,46 @@ const PatientList = () => {
     useEffect(() => {
         fetchPatients();
     }, []);
+
+    const handleOpenAssignModal = (patient) => {
+        setAssignTargetPatient(patient);
+        // 如果病患物件中帶有 manager_id，預設選中
+        setSelectedManagerId(patient.manager_id || patient.details?.manager_id || '');
+        setShowAssignModal(true);
+    };
+
+    const handleAssignManager = async () => {
+        if (!selectedManagerId) {
+            showToast('請選擇個管師', 'error');
+            return;
+        }
+        try {
+            await managementApi.assignUser({
+                user_id: assignTargetPatient.id,
+                manager_id: parseInt(selectedManagerId)
+            });
+            showToast('指派成功', 'success');
+            setShowAssignModal(false);
+            fetchPatients();
+        } catch (error) {
+            showToast('指派失敗: ' + error.message, 'error');
+        }
+    };
+
+    const handleUnassignManager = async (patientId, managerId) => {
+        if (await requestConfirm('確定要解除此個管師的指派嗎？')) {
+            try {
+                await managementApi.unassignUser({
+                    user_id: patientId,
+                    manager_id: managerId
+                });
+                showToast('解除指派成功', 'success');
+                fetchPatients();
+            } catch (error) {
+                showToast('解除失敗: ' + error.message, 'error');
+            }
+        }
+    };
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
@@ -112,10 +177,54 @@ const PatientList = () => {
         }
     };
 
-    const filteredPatients = patients.filter(p => 
-        p.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.username.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const calculateWeeklyProgress = (patientId) => {
+        const userMissions = assignedMissions.filter(m => String(m.user_id) === String(patientId));
+        if (userMissions.length === 0) return 0;
+
+        const thisWeekStart = new Date();
+        thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
+        thisWeekStart.setHours(0, 0, 0, 0);
+
+        const userLogsThisWeek = missionLogs.filter(log =>
+            String(log.user_id) === String(patientId) &&
+            new Date(log.created_at) >= thisWeekStart &&
+            log.mission_status_id === 2
+        );
+
+        const completedUnique = new Set(userLogsThisWeek.map(l => l.mission_id)).size;
+        return Math.min(100, Math.round((completedUnique / userMissions.length) * 100));
+    };
+
+    const getIllnessStatusColor = (status) => {
+        const s = String(status).toLowerCase();
+        if (s.includes('critical') || s.includes('high')) return 'bg-rose-100 text-rose-700 border-rose-200';
+        if (s.includes('warning') || s.includes('medium')) return 'bg-orange-100 text-orange-700 border-orange-200';
+        return 'bg-sky-100 text-sky-700 border-sky-200';
+    };
+
+    const [activeTab, setActiveTab] = useState('all'); // 'all', 'experimental', 'control', 'psychiatric', 'dental', 'sarcopenia'
+
+    const filteredPatients = patients.filter(p => {
+        const matchesSearch = p.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            p.username.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        if (!matchesSearch) return false;
+
+        switch (activeTab) {
+            case 'experimental':
+                return p.role?.name === '實驗組';
+            case 'control':
+                return p.role?.name === '對照組';
+            case 'psychiatric':
+                return p.details?.is_psychiatric === true;
+            case 'dental':
+                return p.details?.is_dental === true;
+            case 'sarcopenia':
+                return p.details?.sarcopenia_level && ['A', 'B', 'C'].includes(p.details.sarcopenia_level);
+            default:
+                return true;
+        }
+    });
 
     return (
         <div className="space-y-6">
@@ -124,7 +233,7 @@ const PatientList = () => {
                     <h2 className="text-2xl font-lora font-bold text-primary">個案總覽清單</h2>
                     <p className="text-text/60 mt-1">管理並追蹤長者的健康狀態與任務進度</p>
                 </div>
-                <button 
+                <button
                     onClick={() => setShowCreateModal(true)}
                     className="px-5 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors cursor-pointer shadow-sm flex items-center space-x-2"
                 >
@@ -133,7 +242,51 @@ const PatientList = () => {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-sky-100/50 overflow-hidden">
-                {/* ... (toolbar and table remain same) ... */}
+                <div className="px-4 pt-4 border-b border-sky-100/50 flex flex-wrap gap-x-4 bg-sky-50/10">
+                    <button 
+                        onClick={() => setActiveTab('all')}
+                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'all' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                    >
+                        全部 ({patients.length})
+                        {activeTab === 'all' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('experimental')}
+                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'experimental' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                    >
+                        實驗組 ({patients.filter(p => p.role?.name === '實驗組').length})
+                        {activeTab === 'experimental' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('control')}
+                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'control' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                    >
+                        對照組 ({patients.filter(p => p.role?.name === '對照組').length})
+                        {activeTab === 'control' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('psychiatric')}
+                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'psychiatric' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                    >
+                        心理問題 ({patients.filter(p => p.details?.is_psychiatric === true).length})
+                        {activeTab === 'psychiatric' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('dental')}
+                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'dental' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                    >
+                        口腔保健 ({patients.filter(p => p.details?.is_dental === true).length})
+                        {activeTab === 'dental' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('sarcopenia')}
+                        className={`pb-3 px-2 text-sm font-bold transition-all cursor-pointer relative ${activeTab === 'sarcopenia' ? 'text-primary' : 'text-text/40 hover:text-text/60'}`}
+                    >
+                        肌少症風險 ({patients.filter(p => p.details?.sarcopenia_level && ['A', 'B', 'C'].includes(p.details.sarcopenia_level)).length})
+                        {activeTab === 'sarcopenia' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
+                    </button>
+                </div>
+
                 <div className="p-4 border-b border-sky-100/50 flex flex-col sm:flex-row gap-4 justify-between bg-sky-50/30">
                     <div className="relative w-full sm:w-80">
                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -163,8 +316,8 @@ const PatientList = () => {
                                 <th className="py-4 px-6">帳號</th>
                                 <th className="py-4 px-6">性別/年齡</th>
                                 <th className="py-4 px-6">肌少症分級</th>
+                                <th className="py-4 px-6">目前個管師</th>
                                 <th className="py-4 px-6">本週進度</th>
-                                <th className="py-4 px-6">狀態標記</th>
                                 <th className="py-4 px-6 text-center">操作</th>
                             </tr>
                         </thead>
@@ -197,20 +350,51 @@ const PatientList = () => {
                                         </span>
                                     </td>
                                     <td className="py-4 px-6">
+                                        {(patient.managers && patient.managers.length > 0) ? (
+                                            <div className="flex flex-col gap-1">
+                                                {patient.managers.map(m => (
+                                                    <span key={m.id} className="text-sm font-bold text-primary flex items-center gap-2">
+                                                        {m.display_name}
+                                                        <button onClick={(e) => { e.stopPropagation(); handleUnassignManager(patient.id, m.id); }} className="text-rose-400 hover:text-rose-600 cursor-pointer p-0.5" title="解除指派"><X size={14} /></button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-text/40 italic">尚未指派</span>
+                                        )}
+                                    </td>
+                                    <td className="py-4 px-6">
                                         <div className="flex items-center space-x-3 w-32">
                                             <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                                                 <div
-                                                    className={`h-full rounded-full bg-primary`}
-                                                    style={{ width: `0%` }} 
+                                                    className={`h-full rounded-full transition-all duration-500 ${calculateWeeklyProgress(patient.id) >= 100 ? 'bg-cta' : 'bg-primary'}`}
+                                                    style={{ width: `${calculateWeeklyProgress(patient.id)}%` }}
                                                 ></div>
                                             </div>
-                                            <span className="text-xs font-medium text-text/70 w-8">0%</span>
+                                            <span className="text-xs font-medium text-text/70 w-8">{calculateWeeklyProgress(patient.id)}%</span>
                                         </div>
                                     </td>
-                                    <td className="py-4 px-6 text-xs text-text/40 italic">
-                                        尚未串接警示邏輯
+                                    <td className="py-4 px-6">
+                                        {patient.illnesses && patient.illnesses.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {patient.illnesses.map((ill, i) => (
+                                                    <span key={i} className={`px-2 py-0.5 text-[10px] font-bold rounded border ${getIllnessStatusColor(ill.illness_status)}`}>
+                                                        {ill.illness_type?.name || '特徵'} {ill.illness_status ? `(${ill.illness_status})` : ''}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-text/40 italic">無特殊狀態</span>
+                                        )}
                                     </td>
                                     <td className="py-4 px-6 text-center whitespace-nowrap">
+                                        <button
+                                            onClick={() => handleOpenAssignModal(patient)}
+                                            className="px-3 py-1.5 text-xs font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 rounded-md transition-colors cursor-pointer mr-2"
+                                            title="指派個管師"
+                                        >
+                                            指派個管師
+                                        </button>
                                         <button
                                             onClick={() => navigate(`/patients/${patient.id}`)}
                                             className="inline-flex items-center justify-center p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors cursor-pointer"
@@ -241,7 +425,7 @@ const PatientList = () => {
                             <h3 className="text-xl font-bold text-primary">新增個案資料</h3>
                             <p className="text-sm text-text/50 mt-1">請輸入病患的基本帳號與健康分級資訊</p>
                         </div>
-                        
+
                         <form onSubmit={handleCreateUser} className="p-6 space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
@@ -252,7 +436,7 @@ const PatientList = () => {
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                         placeholder="例如：王大明"
                                         value={formData.display_name}
-                                        onChange={(e) => setFormData({...formData, display_name: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -263,7 +447,7 @@ const PatientList = () => {
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
                                         placeholder="例如：user_01"
                                         value={formData.username}
-                                        onChange={(e) => setFormData({...formData, username: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                     />
                                 </div>
                             </div>
@@ -276,7 +460,7 @@ const PatientList = () => {
                                     className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                     placeholder="建議 6 位數以上"
                                     value={formData.password}
-                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 />
                             </div>
 
@@ -288,7 +472,7 @@ const PatientList = () => {
                                         type="date"
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                         value={formData.birthday}
-                                        onChange={(e) => setFormData({...formData, birthday: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -296,7 +480,7 @@ const PatientList = () => {
                                     <select
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                         value={formData.gender_id}
-                                        onChange={(e) => setFormData({...formData, gender_id: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, gender_id: e.target.value })}
                                     >
                                         <option value={1}>男性</option>
                                         <option value={2}>女性</option>
@@ -313,7 +497,7 @@ const PatientList = () => {
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                         placeholder="例如：0912345678"
                                         value={formData.phone_number}
-                                        onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -323,7 +507,7 @@ const PatientList = () => {
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                         placeholder="居住縣市與街道"
                                         value={formData.address}
-                                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                     />
                                 </div>
                             </div>
@@ -334,7 +518,7 @@ const PatientList = () => {
                                     <select
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                         value={formData.sarcopenia_level}
-                                        onChange={(e) => setFormData({...formData, sarcopenia_level: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, sarcopenia_level: e.target.value })}
                                     >
                                         <option value="A">A 級 (極需干預)</option>
                                         <option value="B">B 級 (中度風險)</option>
@@ -350,7 +534,7 @@ const PatientList = () => {
                                         className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                         placeholder="用於系統索引"
                                         value={formData.nation_id}
-                                        onChange={(e) => setFormData({...formData, nation_id: e.target.value})}
+                                        onChange={(e) => setFormData({ ...formData, nation_id: e.target.value })}
                                     />
                                 </div>
                             </div>
@@ -365,12 +549,58 @@ const PatientList = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20"
+                                    className="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20 cursor-pointer"
                                 >
                                     確認新增
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Manager Modal */}
+            {showAssignModal && assignTargetPatient && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden border border-sky-100 animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-sky-100 bg-sky-50/50 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-bold text-primary">指派個管師</h3>
+                                <p className="text-sm text-text/50 mt-1">對象: {assignTargetPatient.display_name}</p>
+                            </div>
+                            <button onClick={() => setShowAssignModal(false)} className="text-text/40 hover:text-text cursor-pointer p-1">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-text/70 mb-2">選擇個管師</label>
+                                <select
+                                    value={selectedManagerId}
+                                    onChange={(e) => setSelectedManagerId(e.target.value)}
+                                    className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                                >
+                                    <option value="" disabled>請選擇一位管理師...</option>
+                                    {managers.map(m => (
+                                        <option key={m.id} value={m.id}>{m.display_name} (@{m.username})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex space-x-3 pt-2">
+                                <button
+                                    onClick={() => setShowAssignModal(false)}
+                                    className="flex-1 py-2.5 px-4 border border-sky-200 text-text/60 rounded-xl font-bold hover:bg-sky-50 transition-colors cursor-pointer"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={handleAssignManager}
+                                    className="flex-1 py-2.5 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20 cursor-pointer"
+                                >
+                                    確認指派
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

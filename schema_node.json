@@ -1,0 +1,45 @@
+{
+  "tags": [
+    "Assets (Shared V2)"
+  ],
+  "summary": "Create Asset",
+  "description": "(V2 Admin/Manager) 上傳任務附件檔案。",
+  "operationId": "create_asset_assets__post",
+  "requestBody": {
+    "content": {
+      "multipart/form-data": {
+        "schema": {
+          "$ref": "#/components/schemas/Body_create_asset_assets__post"
+        }
+      }
+    },
+    "required": true
+  },
+  "responses": {
+    "200": {
+      "description": "Successful Response",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/DataAsset"
+          }
+        }
+      }
+    },
+    "422": {
+      "description": "Validation Error",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/HTTPValidationError"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "OAuth2PasswordBearer": []
+    }
+  ]
+}

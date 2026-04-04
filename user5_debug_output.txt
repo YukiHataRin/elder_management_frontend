@@ -1,0 +1,959 @@
+正在登入 https://api.eldercare.fclinlab.com/api/v2/auth/login...
+正在請求使用者清單...
+找到使用者: user5 (@user5), ID: 8
+正在請求任務日誌: https://api.eldercare.fclinlab.com/api/v2/management/missions/logs/users/8
+
+成功獲取 user5 的日誌，共 22 筆資料：
+[
+  {
+    "user_id": 8,
+    "mission_id": 54,
+    "mission_status_id": 2,
+    "id": 43,
+    "assigned_at": "2026-03-20T23:27:43.405895",
+    "updated_at": "2026-03-24T13:32:39.856231",
+    "mission": {
+      "name": "用香水",
+      "detail": "噴一點喜歡的香味，讓自己感覺清新。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 54,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 54,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 57,
+    "mission_status_id": 2,
+    "id": 46,
+    "assigned_at": "2026-03-23T16:05:55.035613",
+    "updated_at": "2026-03-24T13:32:53.269803",
+    "mission": {
+      "name": "計畫一天的活動",
+      "detail": "想好今天要做哪些事情，例如散步、吃飯或打電話。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 57,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 57,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 48,
+    "assigned_at": "2026-03-23T16:15:56.420719",
+    "updated_at": "2026-03-24T14:34:03.490766",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 56,
+    "mission_status_id": 2,
+    "id": 50,
+    "assigned_at": "2026-03-24T13:26:05.968483",
+    "updated_at": "2026-03-24T14:35:21.850999",
+    "mission": {
+      "name": "想著自己喜歡的人",
+      "detail": "想一想讓自己開心的人，例如家人或朋友，並記錄感受。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 56,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 56,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 57,
+    "assigned_at": "2026-03-24T16:13:39.694713",
+    "updated_at": "2026-03-24T16:13:57.945127",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 5,
+    "difficulty_score": 5,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 56,
+    "mission_status_id": 2,
+    "id": 58,
+    "assigned_at": "2026-03-24T16:14:19.770970",
+    "updated_at": "2026-03-24T16:14:31.057082",
+    "mission": {
+      "name": "想著自己喜歡的人",
+      "detail": "想一想讓自己開心的人，例如家人或朋友，並記錄感受。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 56,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 56,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 5,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 59,
+    "assigned_at": "2026-03-24T17:21:59.271799",
+    "updated_at": "2026-03-24T17:24:22.243902",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 5,
+    "satisfaction_score": 5,
+    "difficulty_score": 5,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 55,
+    "mission_status_id": 2,
+    "id": 44,
+    "assigned_at": "2026-03-20T23:27:43.405895",
+    "updated_at": "2026-03-23T15:21:07.139108",
+    "mission": {
+      "name": "聽收音機",
+      "detail": "打開收音機聽音樂、節目或新聞。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 55,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 55,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 45,
+    "assigned_at": "2026-03-23T14:21:43.864448",
+    "updated_at": "2026-03-23T16:07:02.088948",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 5,
+    "difficulty_score": 5,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 56,
+    "mission_status_id": 2,
+    "id": 42,
+    "assigned_at": "2026-03-20T23:24:24.278477",
+    "updated_at": "2026-03-23T16:15:37.266138",
+    "mission": {
+      "name": "想著自己喜歡的人",
+      "detail": "想一想讓自己開心的人，例如家人或朋友，並記錄感受。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 56,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 56,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 1,
+    "satisfaction_score": 1,
+    "difficulty_score": 5,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 4,
+    "mission_status_id": 2,
+    "id": 61,
+    "assigned_at": "2026-03-24T17:36:30.952620",
+    "updated_at": "2026-03-24T17:37:14.253050",
+    "mission": {
+      "name": "練習瑜珈或太極",
+      "detail": "跟著老師或影片，做伸展和呼吸的動作，讓身體放鬆、活動筋骨。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 4,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 4,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 60,
+    "assigned_at": "2026-03-24T17:25:34.338924",
+    "updated_at": "2026-03-24T17:53:40.550114",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 4,
+    "mission_status_id": 2,
+    "id": 62,
+    "assigned_at": "2026-03-24T17:53:53.048758",
+    "updated_at": "2026-03-24T17:54:36.234769",
+    "mission": {
+      "name": "練習瑜珈或太極",
+      "detail": "跟著老師或影片，做伸展和呼吸的動作，讓身體放鬆、活動筋骨。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 4,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 4,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 63,
+    "assigned_at": "2026-03-24T17:53:55.700267",
+    "updated_at": "2026-03-24T19:50:33.224270",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 57,
+    "mission_status_id": 2,
+    "id": 64,
+    "assigned_at": "2026-03-24T17:53:57.209526",
+    "updated_at": "2026-03-24T19:50:46.503938",
+    "mission": {
+      "name": "計畫一天的活動",
+      "detail": "想好今天要做哪些事情，例如散步、吃飯或打電話。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 57,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 57,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 4,
+    "mission_status_id": 2,
+    "id": 65,
+    "assigned_at": "2026-03-24T17:55:13.029638",
+    "updated_at": "2026-03-24T19:50:54.523269",
+    "mission": {
+      "name": "練習瑜珈或太極",
+      "detail": "跟著老師或影片，做伸展和呼吸的動作，讓身體放鬆、活動筋骨。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 4,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 4,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 4,
+    "mission_status_id": 2,
+    "id": 66,
+    "assigned_at": "2026-03-24T19:56:28.037401",
+    "updated_at": "2026-03-24T19:56:47.746002",
+    "mission": {
+      "name": "練習瑜珈或太極",
+      "detail": "跟著老師或影片，做伸展和呼吸的動作，讓身體放鬆、活動筋骨。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 4,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 4,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 47,
+    "assigned_at": "2026-03-23T16:07:09.588002",
+    "updated_at": "2026-03-23T16:15:52.458861",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 1,
+    "satisfaction_score": 5,
+    "difficulty_score": 5,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 67,
+    "assigned_at": "2026-03-24T19:56:52.998181",
+    "updated_at": "2026-03-24T19:57:09.934455",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 4,
+    "mission_status_id": 2,
+    "id": 68,
+    "assigned_at": "2026-03-24T19:59:48.242776",
+    "updated_at": "2026-03-24T20:00:02.450648",
+    "mission": {
+      "name": "練習瑜珈或太極",
+      "detail": "跟著老師或影片，做伸展和呼吸的動作，讓身體放鬆、活動筋骨。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 4,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 4,
+          "file_type_id": 1,
+          "file_type": {
+            "name": "照片",
+            "id": 1
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 16,
+    "mission_status_id": 2,
+    "id": 69,
+    "assigned_at": "2026-03-24T20:00:07.941390",
+    "updated_at": "2026-03-24T20:00:23.748401",
+    "mission": {
+      "name": "唱歌",
+      "detail": "唱自己喜歡的歌，可以自己唱或跟著音樂一起唱。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 16,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 16,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  },
+  {
+    "user_id": 8,
+    "mission_id": 56,
+    "mission_status_id": 2,
+    "id": 49,
+    "assigned_at": "2026-03-23T19:15:26.964076",
+    "updated_at": "2026-03-23T19:19:47.063259",
+    "mission": {
+      "name": "想著自己喜歡的人",
+      "detail": "想一想讓自己開心的人，例如家人或朋友，並記錄感受。",
+      "health_domain_id": 2,
+      "mission_type_id": 3,
+      "id": 56,
+      "health_domain": {
+        "name": "心理",
+        "description": "心理相關疾病",
+        "id": 2
+      },
+      "mission_type": {
+        "name": "文字敘述",
+        "code": null,
+        "id": 3
+      },
+      "return_types": [
+        {
+          "mission_id": 56,
+          "file_type_id": 3,
+          "file_type": {
+            "name": "錄音檔",
+            "id": 3
+          }
+        }
+      ]
+    },
+    "mission_status": {
+      "name": "已完成",
+      "id": 2
+    },
+    "expectation_score": 3,
+    "satisfaction_score": 3,
+    "difficulty_score": 3,
+    "is_compulsory": null
+  }
+]
+
+--- 狀態統計 (1=未完成, 2=已完成, 3=進行中) ---
+未完成 (1): 0
+已完成 (2): 0
+進行中 (3): 0

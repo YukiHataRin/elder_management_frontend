@@ -13,9 +13,9 @@ const getHeaders = () => {
 
 export const apiFetch = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const headers = { ...getHeaders(), ...options.headers };
-  
+
   // Force Authorization header if token exists to avoid race conditions
   const currentToken = localStorage.getItem('token');
   if (currentToken && !headers['Authorization']) {
@@ -47,4 +47,27 @@ export const apiFetch = async (endpoint, options = {}) => {
   }
 
   return response.json();
+};
+
+export const apiFetchBlob = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers = { ...getHeaders(), ...options.headers };
+
+  // Force Authorization header if token exists
+  const currentToken = localStorage.getItem('token');
+  if (currentToken && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${currentToken}`;
+  }
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') window.location.href = '/login';
+    }
+    throw new Error('Asset request failed');
+  }
+
+  return response.blob();
 };

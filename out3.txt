@@ -1,0 +1,83 @@
+正在連線至: https://api.eldercare.fclinlab.com/api/v2
+獲取任務清單中...
+
+--- 找到 2 個相關任務 ---
+[
+  {
+    "name": "口腔操",
+    "detail": "跟著範例影片做動作",
+    "health_domain_id": 1,
+    "mission_type_id": 1,
+    "id": 1,
+    "health_domain": {
+      "name": "口腔",
+      "description": "口腔相關疾病",
+      "id": 1
+    },
+    "mission_type": {
+      "name": "影片",
+      "code": null,
+      "id": 1
+    },
+    "return_types": [],
+    "data_assets": [
+      {
+        "url": "https://youtu.be/i4W5ad4An5M?si=Nrv5z9FbmmjEBLCF",
+        "file_extension_id": 1,
+        "id": 1,
+        "file_extension": {
+          "extension": "wav",
+          "file_type_id": 2,
+          "id": 1,
+          "file_type": {
+            "name": "影片",
+            "id": 2
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "test1",
+    "detail": "test",
+    "health_domain_id": 1,
+    "mission_type_id": 1,
+    "id": 79,
+    "health_domain": {
+      "name": "口腔",
+      "description": "口腔相關疾病",
+      "id": 1
+    },
+    "mission_type": {
+      "name": "影片",
+      "code": null,
+      "id": 1
+    },
+    "return_types": [
+      {
+        "mission_id": 79,
+        "file_type_id": 1,
+        "file_type": {
+          "name": "照片",
+          "id": 1
+        }
+      }
+    ],
+    "data_assets": [
+      {
+        "url": "uploads/20260330124953_螢幕錄製 2025-02-06 145622.mp4",
+        "file_extension_id": 3,
+        "id": 139,
+        "file_extension": {
+          "extension": "mp4",
+          "file_type_id": 2,
+          "id": 3,
+          "file_type": {
+            "name": "影片",
+            "id": 2
+          }
+        }
+      }
+    ]
+  }
+]

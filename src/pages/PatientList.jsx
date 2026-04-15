@@ -21,7 +21,10 @@ const PatientList = () => {
         nation_id: '',
         sarcopenia_level: 'D',
         phone_number: '',
-        address: ''
+        address: '',
+        role_id: 3,
+        is_psychiatric: false,
+        is_dental: false
     });
 
     const [managers, setManagers] = useState([]);
@@ -111,7 +114,7 @@ const PatientList = () => {
                 username: formData.username,
                 password: formData.password,
                 display_name: formData.display_name,
-                role_id: 3, // Role 3 = Patient
+                role_id: parseInt(formData.role_id),
                 is_active: true,
                 details: {
                     birthday: formData.birthday,
@@ -120,6 +123,8 @@ const PatientList = () => {
                     sarcopenia_level: formData.sarcopenia_level,
                     phone_number: formData.phone_number,
                     address: formData.address,
+                    is_psychiatric: formData.is_psychiatric,
+                    is_dental: formData.is_dental,
                     points: 0
                 }
             });
@@ -134,7 +139,10 @@ const PatientList = () => {
                 nation_id: '',
                 sarcopenia_level: 'D',
                 phone_number: '',
-                address: ''
+                address: '',
+                role_id: 3,
+                is_psychiatric: false,
+                is_dental: false
             });
             fetchPatients();
         } catch (error) {
@@ -559,6 +567,40 @@ const PatientList = () => {
                                         value={formData.nation_id}
                                         onChange={(e) => setFormData({ ...formData, nation_id: e.target.value })}
                                     />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">分組 (Group)</label>
+                                    <select
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={formData.role_id}
+                                        onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
+                                    >
+                                        <option value={3}>實驗組 (Experimental)</option>
+                                        <option value={4}>對照組 (Control)</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2 pt-5">
+                                    <label className="flex items-center space-x-2 cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 text-primary rounded border-sky-200 focus:ring-primary"
+                                            checked={formData.is_psychiatric}
+                                            onChange={(e) => setFormData({...formData, is_psychiatric: e.target.checked})}
+                                        />
+                                        <span className="text-sm font-bold text-text/80 group-hover:text-primary transition-colors">具心理問題風險</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 text-primary rounded border-sky-200 focus:ring-primary"
+                                            checked={formData.is_dental}
+                                            onChange={(e) => setFormData({...formData, is_dental: e.target.checked})}
+                                        />
+                                        <span className="text-sm font-bold text-text/80 group-hover:text-primary transition-colors">具口腔保健風險</span>
+                                    </label>
                                 </div>
                             </div>
 

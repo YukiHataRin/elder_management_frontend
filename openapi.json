@@ -246,6 +246,53 @@
         ]
       }
     },
+    "/assets/youtube": {
+      "post": {
+        "tags": [
+          "Assets (Shared V2)"
+        ],
+        "summary": "Create Youtube Asset",
+        "description": "(V2 Admin/Manager) 上傳 YouTube 連結。\n- ！！！``file_extension_id`` 填0即可！！！\n- 此端點用於儲存 YouTube 影片連結至資料庫。",
+        "operationId": "create_youtube_asset_assets_youtube_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataAssetCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataAsset"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/app/me": {
       "get": {
         "tags": [
@@ -310,29 +357,157 @@
           "App (V2)"
         ],
         "summary": "Read User Me Missions",
-        "description": "(V2 App) 取得當前使用者被指派的任務清單。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.MissionLog]`",
+        "description": "(V2 App) 取得當前使用者被指派的任務清單。\n\n- **輸入**: \n    - `mission_filter`: `MissionLogFilter` (查詢參數)\n- **回傳**: `List[schemas.MissionLog]`",
         "operationId": "read_user_me_missions_app_me_missions_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mission Id"
+            }
+          },
+          {
+            "name": "mission_status_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mission Status Id"
+            }
+          },
+          {
+            "name": "assigned_at__gte",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assigned At  Gte"
+            }
+          },
+          {
+            "name": "assigned_at__lte",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assigned At  Lte"
+            }
+          },
+          {
+            "name": "updated_at__gte",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Updated At  Gte"
+            }
+          },
+          {
+            "name": "updated_at__lte",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Updated At  Lte"
+            }
+          },
+          {
+            "name": "order_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Order By"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/MissionLog"
                   },
-                  "type": "array",
                   "title": "Response Read User Me Missions App Me Missions Get"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
     "/app/me/missions/{mission_log_id}": {
@@ -2115,6 +2290,25 @@
         "title": "DataAsset",
         "description": "API 回傳時的資料資產格式"
       },
+      "DataAssetCreate": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "file_extension_id": {
+            "type": "integer",
+            "title": "File Extension Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "file_extension_id"
+        ],
+        "title": "DataAssetCreate",
+        "description": "建立新的資料資產時所需的資料"
+      },
       "FileExtension": {
         "properties": {
           "extension": {
@@ -2850,7 +3044,7 @@
           "role_id": {
             "type": "integer",
             "title": "Role Id",
-            "default": "3"
+            "default": 3
           },
           "details": {
             "anyOf": [
@@ -2918,12 +3112,46 @@
             "title": "Gender Id",
             "default": 1
           },
+          "is_psychiatric": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Psychiatric"
+          },
+          "is_dental": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Dental"
+          },
           "user_id": {
             "type": "integer",
             "title": "User Id"
           },
           "gender": {
             "$ref": "#/components/schemas/Gender"
+          },
+          "joined_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined At"
           }
         },
         "type": "object",
@@ -2982,6 +3210,28 @@
             "type": "integer",
             "title": "Gender Id",
             "default": 1
+          },
+          "is_psychiatric": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Psychiatric"
+          },
+          "is_dental": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Dental"
           }
         },
         "type": "object",
@@ -3071,6 +3321,28 @@
               }
             ],
             "title": "Address"
+          },
+          "is_psychiatric": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Psychiatric"
+          },
+          "is_dental": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Dental"
           }
         },
         "type": "object",

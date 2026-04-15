@@ -159,6 +159,10 @@ const PatientDetail = () => {
     const [isEditingMissions, setIsEditingMissions] = useState(false);
     const [selectedEditMissionIds, setSelectedEditMissionIds] = useState([]);
     const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+    
+    // New states for Mission Logs filtering
+    const [logFilterStatus, setLogFilterStatus] = useState('all'); // 'all', 'completed', 'uncompleted', 'in_progress'
+    const [logFilterTime, setLogFilterTime] = useState('all'); // 'all', 'week', 'month'
 
     const fetchDetail = async () => {
         setLoading(true);
@@ -389,6 +393,27 @@ const PatientDetail = () => {
     const availableMissions = allMissions.filter(m => !assignedMissions.some(am => am.mission_id === (m.id || m.mission_id)));
 
     const details = patient.details || {};
+
+    const filteredMissionLogs = missionLogs.filter(log => {
+        // Status Filter
+        if (logFilterStatus === 'completed' && log.mission_status_id !== 2) return false;
+        if (logFilterStatus === 'in_progress' && log.mission_status_id !== 3) return false;
+        if (logFilterStatus === 'uncompleted' && log.mission_status_id !== 1) return false;
+
+        // Time Filter
+        if (logFilterTime !== 'all') {
+            const logDate = new Date(log.created_at);
+            const now = new Date();
+            if (logFilterTime === 'week') {
+                const weekAgo = new Date(now.setDate(now.getDate() - 7));
+                if (logDate < weekAgo) return false;
+            } else if (logFilterTime === 'month') {
+                const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
+                if (logDate < monthAgo) return false;
+            }
+        }
+        return true;
+    }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
@@ -728,11 +753,32 @@ const PatientDetail = () => {
 
                                 {taskSubTab === 'history' && (
                                     <>
-                                        <div className="flex justify-between items-center mb-4 border-b border-sky-100 pb-2">
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 border-b border-sky-100 pb-3 gap-3">
                                             <h3 className="font-bold text-lg text-primary flex items-center space-x-2">
                                                 <span>歷史執行紀錄</span>
                                                 <span className="text-sm font-bold bg-sky-100 text-primary px-2 py-0.5 rounded-full">{missionLogs.length}</span>
                                             </h3>
+                                            <div className="flex space-x-2">
+                                                <select 
+                                                    className="px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                                                    value={logFilterTime}
+                                                    onChange={(e) => setLogFilterTime(e.target.value)}
+                                                >
+                                                    <option value="all">全部時間</option>
+                                                    <option value="week">最近一週</option>
+                                                    <option value="month">最近一個月</option>
+                                                </select>
+                                                <select 
+                                                    className="px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                                                    value={logFilterStatus}
+                                                    onChange={(e) => setLogFilterStatus(e.target.value)}
+                                                >
+                                                    <option value="all">全部狀態</option>
+                                                    <option value="completed">已完成</option>
+                                                    <option value="in_progress">進行中</option>
+                                                    <option value="uncompleted">未完成</option>
+                                                </select>
+                                            </div>
                                         </div>
                                         {isLogsLoading ? (
                                             <div className="flex flex-col items-center justify-center py-10 text-primary">
@@ -744,9 +790,13 @@ const PatientDetail = () => {
                                                 <FileText size={48} className="mb-4 opacity-50 text-sky-300" />
                                                 <p>此病患尚未有任何任務執行紀錄</p>
                                             </div>
+                                        ) : filteredMissionLogs.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-10 text-text/40 bg-sky-50/30 rounded-xl border border-sky-100">
+                                                <p>沒有符合篩選條件的紀錄</p>
+                                            </div>
                                         ) : (
                                             <div className="grid grid-cols-1 gap-4">
-                                                {missionLogs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(log => {
+                                                {filteredMissionLogs.map(log => {
                                                     const mission = getMissionDetails(log.mission_id);
                                                     const relevantReturns = missionReturns.filter(ret => ret.mission_log_id === log.id);
 

@@ -161,10 +161,62 @@ export const managementApi = {
   }),
 
   // 放棄特定任務綁定的特定檔案類型拘束
-  deleteMissionReturnTypeRelation: (missionId, fileTypeId) =>
-    apiFetch(`/management/missions/data/mission/${missionId}/type/${fileTypeId}`, {
+  deleteMissionReturnTypeRelation: (mission_id, fileTypeId) =>
+    apiFetch(`/management/missions/data/mission/${mission_id}/type/${fileTypeId}`, {
       method: 'DELETE',
     }),
+
+  // --- 通知系統 (Notifications V2) ---
+
+  // 獲取所有通知 (超級管理員或個管師)
+  getNotifications: () => apiFetch('/management/notifications/'),
+
+  // 獲取特定使用者的所有通知
+  getUserNotifications: (userId) => apiFetch(`/management/notifications/${userId}`),
+
+  // 建立新通知 (發送推播)
+  createNotification: (data) => apiFetch('/management/notifications/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 刪除/撤回通知
+  deleteNotification: (notificationId) => apiFetch(`/management/notifications/${notificationId}`, {
+    method: 'DELETE',
+  }),
+
+  // --- 肌少症與心理健康任務分類管理 (V2) ---
+
+  // 獲取特定肌少任務的等級關聯
+  getSarcopeniaMissionLevel: (missionId) => apiFetch(`/management/missions/sarcopenia/${missionId}`),
+
+  // 設定肌少任務的等級
+  assignSarcopeniaMissionLevel: (data) => apiFetch('/management/missions/sarcopenia', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 刪除該肌少任務的等級關聯
+  deleteSarcopeniaMissionLevel: (missionId) => apiFetch(`/management/missions/sarcopenia/${missionId}`, {
+    method: 'DELETE',
+  }),
+
+  // 獲取所有心理任務的類別名稱
+  getMentalMissionNames: () => apiFetch('/management/missions/mental/names'),
+
+  // 獲取該心理任務的分類
+  getMentalMissionType: (missionId) => apiFetch(`/management/missions/mental/${missionId}`),
+
+  // 設定該心理任務的分類
+  assignMentalMissionType: (data) => apiFetch('/management/missions/mental', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 刪除該心理任務的分類關聯
+  deleteMentalMissionType: (missionId) => apiFetch(`/management/missions/mental/${missionId}`, {
+    method: 'DELETE',
+  }),
 };
 
 export const authApi = {

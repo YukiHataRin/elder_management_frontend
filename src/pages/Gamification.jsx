@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Coins, Settings, ArrowUpRight, ArrowDownRight, Users, Heart, Activity, Camera } from 'lucide-react';
+import { Trophy, Coins, Settings, ArrowUpRight, ArrowDownRight, Users, Heart } from 'lucide-react';
 
 const Gamification = () => {
     const rankingSystem = [
@@ -8,12 +8,6 @@ const Gamification = () => {
         { rank: 3, name: '陳爺爺', coins: 2980, trend: 'up', title: '社交活耀' },
         { rank: 4, name: '李阿嬤', coins: 2850, trend: 'down', title: '' },
         { rank: 5, name: '王大明', coins: 1450, trend: 'up', title: '' },
-    ];
-
-    const rules = [
-        { type: '肌少症 A級任務', icon: <Activity className="text-primary" size={20} />, coins: '+10', condition: '依規定完成並上傳佐證' },
-        { type: '社會心理任務', icon: <Heart className="text-rose-500" size={20} />, coins: '+5', condition: '選擇任一任務並評分' },
-        { type: '社會心理照片', icon: <Camera className="text-emerald-500" size={20} />, coins: '+5', condition: '附上社交或完成照片額外加碼' },
     ];
 
     return (

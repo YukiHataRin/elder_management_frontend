@@ -351,6 +351,37 @@
         ]
       }
     },
+    "/app/me/notifications": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Read User Me Notifications",
+        "description": "(V2 App) 取得當前使用者的所有通知。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.Notification]`",
+        "operationId": "read_user_me_notifications_app_me_notifications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  },
+                  "type": "array",
+                  "title": "Response Read User Me Notifications App Me Notifications Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/app/me/missions": {
       "get": {
         "tags": [
@@ -821,6 +852,40 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/app/controlgroup": {
+      "get": {
+        "tags": [
+          "App (V2)"
+        ],
+        "summary": "Get Control Group Assets",
+        "description": "(V2 App) 獲取 Control Group 專屬的特定資產列表 (ID: 263 ~ 286)，並根據檔名標籤 (jili, xinli) 分類。",
+        "operationId": "get_control_group_assets_app_controlgroup_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "items": {
+                      "$ref": "#/components/schemas/DataAsset"
+                    },
+                    "type": "array"
+                  },
+                  "type": "object",
+                  "title": "Response Get Control Group Assets App Controlgroup Get"
                 }
               }
             }
@@ -1438,56 +1503,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Mission"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Management Mission (V2)"
-        ],
-        "summary": "Delete Mission",
-        "description": "(V2 Admin/Manager) 刪除任務並回傳新的任務列表。",
-        "operationId": "delete_mission_management_missions__mission_id__delete",
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "mission_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Mission Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Mission"
-                  },
-                  "title": "Response Delete Mission Management Missions  Mission Id  Delete"
                 }
               }
             }
@@ -2171,6 +2186,495 @@
           }
         }
       }
+    },
+    "/management/missions/sarcopenia/{mission_id}": {
+      "get": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Get Sarcopenia Mission Level",
+        "description": "透過 mission_id 獲取與 level 的關聯。",
+        "operationId": "get_sarcopenia_mission_level_management_missions_sarcopenia__mission_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SarcopeniaMissionsLevel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Delete Sarcopenia Mission Level",
+        "description": "刪除指定的 mission_id 與 level 的關聯。",
+        "operationId": "delete_sarcopenia_mission_level_management_missions_sarcopenia__mission_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Sarcopenia Mission Level Management Missions Sarcopenia  Mission Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/missions/sarcopenia": {
+      "post": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Assign Sarcopenia Mission Level",
+        "description": "設定肌少任務的等級",
+        "operationId": "assign_sarcopenia_mission_level_management_missions_sarcopenia_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SarcopeniaMissionsLevelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Assign Sarcopenia Mission Level Management Missions Sarcopenia Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/missions/mental/names": {
+      "get": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Get Mental Mission Names",
+        "description": "獲取所有 mission_type_id 的 name 分類。",
+        "operationId": "get_mental_mission_names_management_missions_mental_names_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MentalMissionsTypesName"
+                  },
+                  "type": "array",
+                  "title": "Response Get Mental Mission Names Management Missions Mental Names Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/missions/mental/{mission_id}": {
+      "get": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Get Mental Mission Type",
+        "description": "透過 mission_id 獲取與 type_id 的關聯，並載入對應的 name 資訊。",
+        "operationId": "get_mental_mission_type_management_missions_mental__mission_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentalMissionsTypes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Delete Mental Mission Type",
+        "description": "刪除指定的 mission_id 與 type_id 的關聯。",
+        "operationId": "delete_mental_mission_type_management_missions_mental__mission_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Mental Mission Type Management Missions Mental  Mission Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/missions/mental": {
+      "post": {
+        "tags": [
+          "Management Mission (V2)"
+        ],
+        "summary": "Assign Mental Mission Type",
+        "description": "設定心理任務的分類",
+        "operationId": "assign_mental_mission_type_management_missions_mental_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MentalMissionsTypesCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Assign Mental Mission Type Management Missions Mental Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/notifications/": {
+      "get": {
+        "tags": [
+          "Management Notification (V2)"
+        ],
+        "summary": "Read Notifications",
+        "description": "(V2 Management) 獲取所有通知。\n- 超級管理員 (Role 1): 獲取系統內所有通知。\n- 個管師 (Role 2): 僅獲取自己所管理之使用者的通知。\n\n- **輸入**: 無\n- **回傳**: `List[schemas.Notification]`",
+        "operationId": "read_notifications_management_notifications__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  },
+                  "type": "array",
+                  "title": "Response Read Notifications Management Notifications  Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Management Notification (V2)"
+        ],
+        "summary": "Create Notification",
+        "description": "(V2 Management) 建立新通知。\n- 超級管理員 (Role 1): 可發送通知給任一使用者。\n- 個管師 (Role 2): 僅可發送通知給分配給自己的使用者。\n\n- **輸入**: `schemas.NotificationCreate`\n- **回傳**: `schemas.Notification`",
+        "operationId": "create_notification_management_notifications__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/management/notifications/{user_id}": {
+      "get": {
+        "tags": [
+          "Management Notification (V2)"
+        ],
+        "summary": "Read User Notifications",
+        "description": "(V2 Management) 獲取特定使用者的所有通知。\n- 超級管理員 (Role 1): 可獲取任一使用者的通知。\n- 個管師 (Role 2): 僅可獲取分配給自己的使用者的通知。\n\n- **輸入**: \n    - `user_id`: 使用者 ID (路徑參數)\n- **回傳**: `List[schemas.Notification]`",
+        "operationId": "read_user_notifications_management_notifications__user_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  },
+                  "title": "Response Read User Notifications Management Notifications  User Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/management/notifications/{notification_id}": {
+      "delete": {
+        "tags": [
+          "Management Notification (V2)"
+        ],
+        "summary": "Delete Notification",
+        "description": "(V2 Management) 刪除通知。\n- 超級管理員 (Role 1): 可刪除任一通知。\n- 個管師 (Role 2): 僅可刪除分配給自己的使用者的通知。\n\n- **輸入**: \n    - `notification_id`: 通知 ID (路徑參數)\n- **回傳**: `{\"message\": \"通知已刪除\"}`",
+        "operationId": "delete_notification_management_notifications__notification_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Notification Management Notifications  Notification Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2454,6 +2958,64 @@
         ],
         "title": "IllnessType",
         "description": "API 回傳時的疾病種類格式"
+      },
+      "MentalMissionsTypes": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type_id": {
+            "type": "integer",
+            "title": "Type Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/MentalMissionsTypesName"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type_id",
+          "type"
+        ],
+        "title": "MentalMissionsTypes"
+      },
+      "MentalMissionsTypesCreate": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "type_id": {
+            "type": "integer",
+            "title": "Type Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type_id"
+        ],
+        "title": "MentalMissionsTypesCreate"
+      },
+      "MentalMissionsTypesName": {
+        "properties": {
+          "mission_type_id": {
+            "type": "integer",
+            "title": "Mission Type Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mission_type_id",
+          "name"
+        ],
+        "title": "MentalMissionsTypesName"
       },
       "Mission": {
         "properties": {
@@ -2960,6 +3522,99 @@
         "type": "object",
         "title": "MissionUpdate",
         "description": "更新任務時所需的資料"
+      },
+      "Notification": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "send_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Send At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "content",
+          "id",
+          "user_id",
+          "send_at"
+        ],
+        "title": "Notification"
+      },
+      "NotificationCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "content",
+          "user_id"
+        ],
+        "title": "NotificationCreate"
+      },
+      "SarcopeniaMissionsLevel": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "level"
+        ],
+        "title": "SarcopeniaMissionsLevel"
+      },
+      "SarcopeniaMissionsLevelCreate": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "level"
+        ],
+        "title": "SarcopeniaMissionsLevelCreate"
       },
       "Token": {
         "properties": {

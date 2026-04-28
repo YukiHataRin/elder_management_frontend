@@ -6,7 +6,7 @@ import TaskManager from './pages/TaskManager';
 import Gamification from './pages/Gamification';
 import BackendUserManagement from './pages/BackendUserManagement';
 import Login from './pages/Login';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 import { ToastProvider } from './context/ToastContext';
 
 const ProtectedRoute = ({ children }) => {

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Camera, Heart, Star, Send, Loader2, UserPlus, UserMinus, FileText } from 'lucide-react';
+import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, Star, Send, Loader2, UserPlus, FileText, Search, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { managementApi } from '../api/management';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/useAuth';
+import { useToast } from '../context/useToast';
 import { apiFetchBlob } from '../api/client'; // Import apiFetchBlob
 
 // Helper component to display mission return media
@@ -140,7 +140,7 @@ const PatientDetail = () => {
     
     // Assignment states
     const [caseManagers, setCaseManagers] = useState([]);
-    const [selectedManager, setSelectedManager] = useState('');
+    const [selectedManagerIds, setSelectedManagerIds] = useState([]);
     const [isAssigning, setIsAssigning] = useState(false);
     
     // Mission states
@@ -163,19 +163,32 @@ const PatientDetail = () => {
     // New states for Mission Logs filtering
     const [logFilterStatus, setLogFilterStatus] = useState('all'); // 'all', 'completed', 'uncompleted', 'in_progress'
     const [logFilterTime, setLogFilterTime] = useState('all'); // 'all', 'week', 'month'
+    const [logFilterReturn, setLogFilterReturn] = useState('all'); // 'all', 'with_return', 'without_return'
+    const [logFilterKeyword, setLogFilterKeyword] = useState('');
 
-    const fetchDetail = async () => {
+    // Notifications state
+    const [notifications, setNotifications] = useState([]);
+    const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+    const [newNotifTitle, setNewNotifTitle] = useState('');
+    const [newNotifContent, setNewNotifContent] = useState('');
+    const [isSendingNotif, setIsSendingNotif] = useState(false);
+
+    const getManagerIds = useCallback((user) => (user?.managers || []).map(m => String(m.id)), []);
+
+    const fetchDetail = useCallback(async () => {
+        await Promise.resolve();
         setLoading(true);
         try {
             const data = await managementApi.getPatientDetail(id);
             setPatient(data);
+            setSelectedManagerIds(getManagerIds(data));
         } catch (error) {
             console.error('Failed to fetch patient detail:', error);
         }
         setLoading(false);
-    };
+    }, [id, getManagerIds]);
 
-    const fetchManagers = async () => {
+    const fetchManagers = useCallback(async () => {
         if (!isAdmin) return;
         try {
             const data = await managementApi.getBackendUsers(2); // Role 2 = Case Managers
@@ -183,9 +196,9 @@ const PatientDetail = () => {
         } catch (error) {
             console.error('Failed to fetch managers:', error);
         }
-    };
+    }, [isAdmin]);
 
-    const fetchMissions = async () => {
+    const fetchMissions = useCallback(async () => {
         try {
             const data = await managementApi.getMissionsElective();
             const userMissions = data.filter(m => String(m.user_id) === String(id));
@@ -193,9 +206,10 @@ const PatientDetail = () => {
         } catch (error) {
             console.error('Failed to fetch assigned missions:', error);
         }
-    };
+    }, [id]);
 
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
+        await Promise.resolve();
         setIsLogsLoading(true);
         try {
             const [userLogs, userReturns] = await Promise.all([
@@ -210,16 +224,70 @@ const PatientDetail = () => {
         } finally {
             setIsLogsLoading(false);
         }
+    }, [id]);
+
+    const fetchNotifications = useCallback(async () => {
+        await Promise.resolve();
+        setIsNotificationsLoading(true);
+        try {
+            const data = await managementApi.getUserNotifications(id);
+            if (Array.isArray(data)) {
+                setNotifications(data.sort((a, b) => new Date(b.send_at) - new Date(a.send_at)));
+            }
+        } catch (error) {
+            console.error('Failed to fetch notifications:', error);
+        } finally {
+            setIsNotificationsLoading(false);
+        }
+    }, [id]);
+
+    const handleSendNotification = async (e) => {
+        if (e) e.preventDefault();
+        if (!newNotifTitle.trim() || !newNotifContent.trim()) {
+            return showToast('請輸入通知標題與內容', 'error');
+        }
+
+        setIsSendingNotif(true);
+        try {
+            await managementApi.createNotification({
+                title: newNotifTitle,
+                content: newNotifContent,
+                user_id: parseInt(id)
+            });
+            showToast('通知已發送', 'success');
+            setNewNotifTitle('');
+            setNewNotifContent('');
+            fetchNotifications();
+        } catch (error) {
+            console.error('Failed to send notification:', error);
+            showToast('發送失敗', 'error');
+        } finally {
+            setIsSendingNotif(false);
+        }
     };
 
-    const fetchAllMissions = async () => {
+    const handleDeleteNotification = async (notifId) => {
+        const confirmed = await requestConfirm('確認刪除', '確定要撤回這則通知嗎？');
+        if (!confirmed) return;
+
+        try {
+            await managementApi.deleteNotification(notifId);
+            showToast('通知已刪除', 'success');
+            fetchNotifications();
+        } catch (error) {
+            console.error('Failed to delete notification:', error);
+            showToast('刪除失敗', 'error');
+        }
+    };
+
+    const fetchAllMissions = useCallback(async () => {
         try {
             const data = await managementApi.getMissions();
             if (Array.isArray(data)) setAllMissions(data);
         } catch (error) {
             console.error('Failed to fetch all missions:', error);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchDetail();
@@ -227,37 +295,62 @@ const PatientDetail = () => {
         fetchMissions();
         fetchLogs();
         fetchAllMissions();
-    }, [id]);
+        fetchNotifications();
+    }, [fetchAllMissions, fetchDetail, fetchLogs, fetchManagers, fetchMissions, fetchNotifications]);
 
-    const handleAssign = async () => {
-        if (!selectedManager) return;
-        setIsAssigning(true);
-        try {
-            await managementApi.assignUser({
-                manager_id: parseInt(selectedManager),
-                user_id: parseInt(id)
-            });
-            showToast('分配成功', 'success');
-            fetchDetail(); // Refresh to show updated managers if backend returns them
-        } catch (error) {
-            showToast('分配失敗: ' + error.message, 'error');
-        }
-        setIsAssigning(false);
+    const toggleSelectedManager = (managerId) => {
+        const value = String(managerId);
+        setSelectedManagerIds(prev => (
+            prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+        ));
     };
 
-    const handleUnassign = async () => {
-        if (!(await requestConfirm('確定要解除此病患的個管師指派嗎？'))) return;
+    const handleSaveManagers = async () => {
+        const originalIds = getManagerIds(patient);
+        const nextIds = selectedManagerIds.map(String);
+        const idsToAdd = nextIds.filter(managerId => !originalIds.includes(managerId));
+        const idsToRemove = originalIds.filter(managerId => !nextIds.includes(managerId));
+
+        if (idsToAdd.length === 0 && idsToRemove.length === 0) return;
+
+        setIsAssigning(true);
+        try {
+            await Promise.all([
+                ...idsToAdd.map(managerId => managementApi.assignUser({
+                    manager_id: parseInt(managerId),
+                    user_id: parseInt(id)
+                })),
+                ...idsToRemove.map(managerId => managementApi.unassignUser({
+                    manager_id: parseInt(managerId),
+                    user_id: parseInt(id)
+                }))
+            ]);
+            showToast('個管師指派已更新', 'success');
+            fetchDetail();
+        } catch (error) {
+            showToast('更新指派失敗: ' + error.message, 'error');
+            fetchDetail();
+        } finally {
+            setIsAssigning(false);
+        }
+    };
+
+    const handleUnassignManager = async (managerId) => {
+        if (!(await requestConfirm('確定要解除此個管師的指派嗎？'))) return;
         setIsAssigning(true);
         try {
             await managementApi.unassignUser({
+                manager_id: parseInt(managerId),
                 user_id: parseInt(id)
             });
             showToast('解除指派成功', 'success');
             fetchDetail();
         } catch (error) {
             showToast('解除指派失敗: ' + error.message, 'error');
+            fetchDetail();
+        } finally {
+            setIsAssigning(false);
         }
-        setIsAssigning(false);
     };
 
     const handleOpenAddMission = () => {
@@ -366,6 +459,19 @@ const PatientDetail = () => {
         });
     };
 
+    const getLogStatusMeta = (statusId) => {
+        if (statusId === 2) return { label: '已完成', value: 'completed', className: 'text-cta bg-green-50 border-green-100' };
+        if (statusId === 3) return { label: '進行中', value: 'in_progress', className: 'text-blue-600 bg-blue-50 border-blue-100' };
+        return { label: '未完成', value: 'uncompleted', className: 'text-orange-600 bg-orange-50 border-orange-100' };
+    };
+
+    const clearLogFilters = () => {
+        setLogFilterStatus('all');
+        setLogFilterTime('all');
+        setLogFilterReturn('all');
+        setLogFilterKeyword('');
+    };
+
     if (loading) {
         return (
             <div className="h-full flex flex-col items-center justify-center text-primary space-y-4">
@@ -394,11 +500,20 @@ const PatientDetail = () => {
 
     const details = patient.details || {};
 
+    const statusFilterOptions = [
+        { value: 'all', label: '全部', count: missionLogs.length },
+        { value: 'completed', label: '已完成', count: missionLogs.filter(log => log.mission_status_id === 2).length },
+        { value: 'in_progress', label: '進行中', count: missionLogs.filter(log => log.mission_status_id === 3).length },
+        { value: 'uncompleted', label: '未完成', count: missionLogs.filter(log => log.mission_status_id === 1 || ![2, 3].includes(log.mission_status_id)).length },
+    ];
+
+    const hasActiveLogFilters = logFilterStatus !== 'all' || logFilterTime !== 'all' || logFilterReturn !== 'all' || logFilterKeyword.trim() !== '';
+
     const filteredMissionLogs = missionLogs.filter(log => {
         // Status Filter
         if (logFilterStatus === 'completed' && log.mission_status_id !== 2) return false;
         if (logFilterStatus === 'in_progress' && log.mission_status_id !== 3) return false;
-        if (logFilterStatus === 'uncompleted' && log.mission_status_id !== 1) return false;
+        if (logFilterStatus === 'uncompleted' && [2, 3].includes(log.mission_status_id)) return false;
 
         // Time Filter
         if (logFilterTime !== 'all') {
@@ -412,6 +527,27 @@ const PatientDetail = () => {
                 if (logDate < monthAgo) return false;
             }
         }
+
+        const relevantReturns = missionReturns.filter(ret => String(ret.mission_log_id) === String(log.id));
+        if (logFilterReturn === 'with_return' && relevantReturns.length === 0) return false;
+        if (logFilterReturn === 'without_return' && relevantReturns.length > 0) return false;
+
+        const keyword = logFilterKeyword.trim().toLowerCase();
+        if (keyword) {
+            const mission = getMissionDetails(log.mission_id);
+            const searchableText = [
+                mission?.title,
+                mission?.name,
+                mission?.desc,
+                mission?.description,
+                mission?.health_domain?.name,
+                mission?.mission_type?.name,
+                log.note,
+                log.mission_id,
+            ].filter(Boolean).join(' ').toLowerCase();
+            if (!searchableText.includes(keyword)) return false;
+        }
+
         return true;
     }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
@@ -431,6 +567,8 @@ const PatientDetail = () => {
                         <span className={`px-3 py-1 text-sm font-bold rounded-full border ${
                             details.sarcopenia_level === 'A' ? 'bg-rose-100 text-rose-700 border-rose-200' :
                             details.sarcopenia_level === 'B' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                            details.sarcopenia_level === 'D' ? 'bg-green-100 text-green-700 border-green-200' :
+                            details.sarcopenia_level === 'E' ? 'bg-green-100 text-green-700 border-green-200' :
                             'bg-sky-100 text-primary border-sky-200'
                         }`}>
                             肌少症 {details.sarcopenia_level || '未分級'} 級
@@ -521,26 +659,68 @@ const PatientDetail = () => {
                             </h4>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-purple-700 mb-1.5 ml-1">選擇負責個管師</label>
-                                    <select 
-                                        className="w-full px-3 py-2 border border-purple-100 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
-                                        value={selectedManager}
-                                        onChange={(e) => setSelectedManager(e.target.value)}
-                                        disabled={isAssigning}
-                                    >
-                                        <option value="">-- 請選擇個管師 --</option>
-                                        {caseManagers.map(m => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.display_name} ({m.username})
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-xs font-bold text-purple-700 ml-1">負責個管師</label>
+                                        <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                                            已選 {selectedManagerIds.length} 位
+                                        </span>
+                                    </div>
+                                    {(patient.managers && patient.managers.length > 0) ? (
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                            {patient.managers.map(manager => (
+                                                <span key={manager.id} className="inline-flex items-center gap-1.5 rounded-full bg-white border border-purple-100 px-2.5 py-1 text-xs font-bold text-purple-800">
+                                                    {manager.display_name}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUnassignManager(manager.id)}
+                                                        disabled={isAssigning}
+                                                        className="text-purple-300 hover:text-rose-500 disabled:opacity-40"
+                                                        title="解除此個管師"
+                                                    >
+                                                        <XCircle size={13} />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mb-3 rounded-lg border border-dashed border-purple-100 bg-white/70 py-3 text-center text-xs text-purple-300">
+                                            尚未指派任何個管師
+                                        </p>
+                                    )}
+                                    <div className="max-h-56 overflow-y-auto rounded-xl border border-purple-100 bg-white p-2 space-y-1">
+                                        {caseManagers.length === 0 ? (
+                                            <p className="py-5 text-center text-xs text-text/40">目前沒有可指派的個管師</p>
+                                        ) : caseManagers.map(manager => {
+                                            const managerId = String(manager.id);
+                                            const checked = selectedManagerIds.includes(managerId);
+                                            return (
+                                                <label
+                                                    key={manager.id}
+                                                    className={`flex items-center gap-3 rounded-lg border p-2.5 cursor-pointer transition-colors ${
+                                                        checked ? 'bg-purple-50 border-purple-200' : 'bg-white border-transparent hover:border-purple-100'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-200 cursor-pointer"
+                                                        checked={checked}
+                                                        disabled={isAssigning}
+                                                        onChange={() => toggleSelectedManager(managerId)}
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-text truncate">{manager.display_name}</p>
+                                                        <p className="text-[10px] text-text/40 truncate">@{manager.username}</p>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                                 <button 
-                                    onClick={handleAssign}
-                                    disabled={isAssigning || !selectedManager}
+                                    onClick={handleSaveManagers}
+                                    disabled={isAssigning}
                                     className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center space-x-2 ${
-                                        isAssigning || !selectedManager 
+                                        isAssigning
                                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
                                         : 'bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-200 cursor-pointer'
                                     }`}
@@ -550,24 +730,12 @@ const PatientDetail = () => {
                                     ) : (
                                         <>
                                             <UserPlus size={16} />
-                                            <span>確認指派</span>
+                                            <span>儲存指派</span>
                                         </>
                                     )}
                                 </button>
-                                <button 
-                                    onClick={handleUnassign}
-                                    disabled={isAssigning}
-                                    className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center space-x-2 ${
-                                        isAssigning 
-                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                                        : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 cursor-pointer'
-                                    }`}
-                                >
-                                    <UserMinus size={16} />
-                                    <span>解除所有指派</span>
-                                </button>
                                 <p className="text-[10px] text-purple-400 text-center italic">
-                                    註：指派後該個管師即可管理此病患
+                                    註：可同時指派多位個管師管理此病患
                                 </p>
                             </div>
                         </div>
@@ -590,9 +758,104 @@ const PatientDetail = () => {
                             >
                                 健康數據與問卷
                             </button>
+                            <button
+                                className={`flex-1 py-4 text-center font-bold text-sm transition-colors cursor-pointer ${activeTab === 'notifications' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-text/50 hover:bg-sky-50'}`}
+                                onClick={() => setActiveTab('notifications')}
+                            >
+                                通知管理
+                            </button>
                         </div>
 
                         <div className="p-6 relative">
+                            {activeTab === 'notifications' && (
+                                <div className="space-y-8">
+                                    {/* 發送新通知 */}
+                                    <div className="bg-sky-50/50 p-6 rounded-2xl border border-sky-100 shadow-sm">
+                                        <h3 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+                                            <Send size={20} />
+                                            發送新推播通知
+                                        </h3>
+                                        <form onSubmit={handleSendNotification} className="space-y-4">
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-bold text-text/60 ml-1">通知標題</label>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="例如：提醒填寫每日飲食紀錄"
+                                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        value={newNotifTitle}
+                                                        onChange={(e) => setNewNotifTitle(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-bold text-text/60 ml-1">通知內容</label>
+                                                    <textarea 
+                                                        rows="3"
+                                                        placeholder="請輸入詳細的通知訊息..."
+                                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                                                        value={newNotifContent}
+                                                        onChange={(e) => setNewNotifContent(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-end">
+                                                <button 
+                                                    type="submit"
+                                                    disabled={isSendingNotif || !newNotifTitle.trim() || !newNotifContent.trim()}
+                                                    className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-all shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                >
+                                                    {isSendingNotif ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                                    發送通知
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    {/* 歷史通知列表 */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-lg font-bold text-text/80 flex items-center justify-between border-b border-sky-100 pb-2">
+                                            <span>歷史發送紀錄</span>
+                                            <span className="text-sm font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{notifications.length}</span>
+                                        </h3>
+
+                                        {isNotificationsLoading ? (
+                                            <div className="flex flex-col items-center justify-center py-10 text-primary">
+                                                <Loader2 size={32} className="animate-spin mb-3" />
+                                                <p>載入通知紀錄中...</p>
+                                            </div>
+                                        ) : notifications.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-text/30 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-100">
+                                                <Send size={48} className="mb-4 opacity-20" />
+                                                <p>目前尚無任何通知發送紀錄</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {notifications.map(notif => (
+                                                    <div key={notif.id} className="bg-white p-5 rounded-2xl border border-sky-50 shadow-sm hover:border-sky-200 transition-colors group relative">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <h4 className="font-bold text-text text-lg pr-12">{notif.title}</h4>
+                                                            <button 
+                                                                onClick={() => handleDeleteNotification(notif.id)}
+                                                                className="absolute top-4 right-4 p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                                title="撤回通知"
+                                                            >
+                                                                <XCircle size={20} />
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-text/70 text-sm leading-relaxed mb-4 whitespace-pre-wrap">{notif.content}</p>
+                                                        <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                                <CheckCircle size={10} className="text-cta" /> 已成功推送
+                                                            </span>
+                                                            <span className="text-xs text-text/40">{formatLogDate(notif.send_at)}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             {activeTab === 'tasks' && (
                             <div className="space-y-4">
                                 <div className="flex mb-4">
@@ -753,31 +1016,88 @@ const PatientDetail = () => {
 
                                 {taskSubTab === 'history' && (
                                     <>
-                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 border-b border-sky-100 pb-3 gap-3">
-                                            <h3 className="font-bold text-lg text-primary flex items-center space-x-2">
-                                                <span>歷史執行紀錄</span>
-                                                <span className="text-sm font-bold bg-sky-100 text-primary px-2 py-0.5 rounded-full">{missionLogs.length}</span>
-                                            </h3>
-                                            <div className="flex space-x-2">
-                                                <select 
-                                                    className="px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
-                                                    value={logFilterTime}
-                                                    onChange={(e) => setLogFilterTime(e.target.value)}
-                                                >
-                                                    <option value="all">全部時間</option>
-                                                    <option value="week">最近一週</option>
-                                                    <option value="month">最近一個月</option>
-                                                </select>
-                                                <select 
-                                                    className="px-3 py-1.5 border border-sky-200 rounded-lg text-xs font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
-                                                    value={logFilterStatus}
-                                                    onChange={(e) => setLogFilterStatus(e.target.value)}
-                                                >
-                                                    <option value="all">全部狀態</option>
-                                                    <option value="completed">已完成</option>
-                                                    <option value="in_progress">進行中</option>
-                                                    <option value="uncompleted">未完成</option>
-                                                </select>
+                                        <div className="mb-5 space-y-4 border-b border-sky-100 pb-4">
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <h3 className="font-bold text-lg text-primary flex items-center space-x-2">
+                                                    <span>歷史執行紀錄</span>
+                                                    <span className="text-sm font-bold bg-sky-100 text-primary px-2 py-0.5 rounded-full">{missionLogs.length}</span>
+                                                </h3>
+                                                <div className="flex items-center gap-2 text-xs font-bold text-text/50">
+                                                    <SlidersHorizontal size={15} />
+                                                    <span>目前顯示 {filteredMissionLogs.length} / {missionLogs.length} 筆</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-xl border border-sky-100 bg-slate-50/70 p-3 space-y-3">
+                                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                                    <div className="flex flex-wrap gap-2" role="group" aria-label="依任務狀態篩選">
+                                                        {statusFilterOptions.map(option => (
+                                                            <button
+                                                                key={option.value}
+                                                                type="button"
+                                                                onClick={() => setLogFilterStatus(option.value)}
+                                                                className={`min-h-10 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${
+                                                                    logFilterStatus === option.value
+                                                                        ? 'bg-primary text-white border-primary shadow-sm'
+                                                                        : 'bg-white text-text/60 border-slate-200 hover:border-primary/30 hover:text-primary'
+                                                                }`}
+                                                            >
+                                                                {option.label}
+                                                                <span className={`ml-1 ${logFilterStatus === option.value ? 'text-white/80' : 'text-text/35'}`}>({option.count})</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearLogFilters}
+                                                        disabled={!hasActiveLogFilters}
+                                                        className="min-h-10 px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-bold text-text/60 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <RotateCcw size={14} />
+                                                        清除篩選
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    <label className="space-y-1">
+                                                        <span className="text-[11px] font-bold text-text/50">搜尋任務</span>
+                                                        <div className="relative">
+                                                            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text/35" />
+                                                            <input
+                                                                type="search"
+                                                                className="w-full min-h-10 pl-9 pr-3 border border-sky-100 rounded-lg text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                                                                placeholder="任務名稱、領域、備註"
+                                                                value={logFilterKeyword}
+                                                                onChange={(e) => setLogFilterKeyword(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </label>
+                                                    <label className="space-y-1">
+                                                        <span className="text-[11px] font-bold text-text/50">時間範圍</span>
+                                                        <select 
+                                                            className="w-full min-h-10 px-3 border border-sky-100 rounded-lg text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                                                            value={logFilterTime}
+                                                            onChange={(e) => setLogFilterTime(e.target.value)}
+                                                        >
+                                                            <option value="all">全部時間</option>
+                                                            <option value="week">最近一週</option>
+                                                            <option value="month">最近一個月</option>
+                                                        </select>
+                                                    </label>
+                                                    <label className="space-y-1">
+                                                        <span className="text-[11px] font-bold text-text/50">成果回傳</span>
+                                                        <select 
+                                                            className="w-full min-h-10 px-3 border border-sky-100 rounded-lg text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                                                            value={logFilterReturn}
+                                                            onChange={(e) => setLogFilterReturn(e.target.value)}
+                                                        >
+                                                            <option value="all">全部紀錄</option>
+                                                            <option value="with_return">有成果回傳</option>
+                                                            <option value="without_return">無成果回傳</option>
+                                                        </select>
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
                                         {isLogsLoading ? (
@@ -798,7 +1118,8 @@ const PatientDetail = () => {
                                             <div className="grid grid-cols-1 gap-4">
                                                 {filteredMissionLogs.map(log => {
                                                     const mission = getMissionDetails(log.mission_id);
-                                                    const relevantReturns = missionReturns.filter(ret => ret.mission_log_id === log.id);
+                                                    const relevantReturns = missionReturns.filter(ret => String(ret.mission_log_id) === String(log.id));
+                                                    const statusMeta = getLogStatusMeta(log.mission_status_id);
 
                                                     return (
                                                         <div key={log.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
@@ -818,7 +1139,7 @@ const PatientDetail = () => {
                                                                     ))}
                                                                 </div>
                                                             )}
-                                                            <h4 className="font-bold text-text text-lg">{mission?.name || '未知任務'}</h4>
+                                                            <h4 className="font-bold text-text text-lg">{mission?.title || mission?.name || '未知任務'}</h4>
                                                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-2">
                                                                 <div className="bg-sky-50/50 p-2 rounded-lg border border-sky-100/50">
                                                                     <p className="text-[10px] text-text/50 block">期待度</p>
@@ -836,8 +1157,8 @@ const PatientDetail = () => {
 
                                                             <div className="flex justify-between items-center text-xs border-t border-slate-50 pt-2">
                                                                 <p className="text-text/70">狀態: 
-                                                                    <span className={`font-bold ml-1 ${log.mission_status_id === 2 ? 'text-cta' : log.mission_status_id === 3 ? 'text-blue-500' : 'text-orange-500'}`}>
-                                                                    {log.mission_status_id === 2 ? '已完成' : log.mission_status_id === 3 ? '進行中' : '未完成'}
+                                                                    <span className={`inline-flex ml-1 px-2 py-0.5 rounded-full border font-bold ${statusMeta.className}`}>
+                                                                        {statusMeta.label}
                                                                     </span>
                                                                 </p>
                                                                 <div className="text-right text-[10px] text-text/40">

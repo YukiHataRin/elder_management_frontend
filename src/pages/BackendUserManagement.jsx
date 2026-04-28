@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { managementApi } from '../api/management';
 import { Shield, UserCheck, UserX, Clock, Search, Filter, Users, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -22,7 +22,8 @@ const BackendUserManagement = () => {
         role_id: 2 // Default to Manager
     });
 
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
+        await Promise.resolve();
         setLoading(true);
         try {
             const data = await managementApi.getBackendUsers(filterRole);
@@ -31,11 +32,14 @@ const BackendUserManagement = () => {
             console.error('Failed to fetch backend users', error);
         }
         setLoading(false);
-    };
+    }, [filterRole]);
 
     useEffect(() => {
-        fetchUsers();
-    }, [filterRole]);
+        const timerId = window.setTimeout(() => {
+            fetchUsers();
+        }, 0);
+        return () => window.clearTimeout(timerId);
+    }, [fetchUsers]);
 
     const handleCreateBackendUser = async (e) => {
         e.preventDefault();

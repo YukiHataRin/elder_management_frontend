@@ -1,9 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react';
-
-const ToastContext = createContext();
-
-export const useToast = () => useContext(ToastContext);
+import { ToastContext } from './toast-context';
 
 export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);

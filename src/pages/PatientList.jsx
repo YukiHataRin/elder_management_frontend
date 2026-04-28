@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, AlertTriangle, ArrowRight, Trash2 } from 'lucide-react';
+import { Search, Filter, AlertTriangle, ArrowRight, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { managementApi } from '../api/management';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../context/useToast';
 
 const PatientList = () => {
     const navigate = useNavigate();
@@ -19,7 +19,7 @@ const PatientList = () => {
         birthday: '',
         gender_id: 1,
         nation_id: '',
-        sarcopenia_level: 'D',
+        sarcopenia_level: 'E',
         phone_number: '',
         address: '',
         role_id: 3,
@@ -32,7 +32,8 @@ const PatientList = () => {
     const [assignedMissions, setAssignedMissions] = useState([]);
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [assignTargetPatient, setAssignTargetPatient] = useState(null);
-    const [selectedManagerId, setSelectedManagerId] = useState('');
+    const [selectedManagerIds, setSelectedManagerIds] = useState([]);
+    const [isAssigningManagers, setIsAssigningManagers] = useState(false);
 
     const fetchPatients = async () => {
         setLoading(true);
@@ -67,28 +68,54 @@ const PatientList = () => {
         fetchPatients();
     }, []);
 
+    const getManagerIds = (patient) => (patient?.managers || []).map(m => String(m.id));
+
     const handleOpenAssignModal = (patient) => {
         setAssignTargetPatient(patient);
-        // 如果病患物件中帶有 manager_id，預設選中
-        setSelectedManagerId(patient.manager_id || patient.details?.manager_id || '');
+        setSelectedManagerIds(getManagerIds(patient));
         setShowAssignModal(true);
     };
 
+    const toggleSelectedManager = (managerId) => {
+        const id = String(managerId);
+        setSelectedManagerIds(prev => (
+            prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
+        ));
+    };
+
     const handleAssignManager = async () => {
-        if (!selectedManagerId) {
-            showToast('請選擇個管師', 'error');
+        if (!assignTargetPatient) return;
+
+        const originalIds = getManagerIds(assignTargetPatient);
+        const nextIds = selectedManagerIds.map(String);
+        const idsToAdd = nextIds.filter(managerId => !originalIds.includes(managerId));
+        const idsToRemove = originalIds.filter(managerId => !nextIds.includes(managerId));
+
+        if (idsToAdd.length === 0 && idsToRemove.length === 0) {
+            setShowAssignModal(false);
             return;
         }
+
+        setIsAssigningManagers(true);
         try {
-            await managementApi.assignUser({
-                user_id: assignTargetPatient.id,
-                manager_id: parseInt(selectedManagerId)
-            });
-            showToast('指派成功', 'success');
+            await Promise.all([
+                ...idsToAdd.map(managerId => managementApi.assignUser({
+                    user_id: assignTargetPatient.id,
+                    manager_id: parseInt(managerId)
+                })),
+                ...idsToRemove.map(managerId => managementApi.unassignUser({
+                    user_id: assignTargetPatient.id,
+                    manager_id: parseInt(managerId)
+                }))
+            ]);
+            showToast('個管師指派已更新', 'success');
             setShowAssignModal(false);
             fetchPatients();
         } catch (error) {
-            showToast('指派失敗: ' + error.message, 'error');
+            showToast('更新指派失敗: ' + error.message, 'error');
+            fetchPatients();
+        } finally {
+            setIsAssigningManagers(false);
         }
     };
 
@@ -137,7 +164,7 @@ const PatientList = () => {
                 birthday: '',
                 gender_id: 1,
                 nation_id: '',
-                sarcopenia_level: 'D',
+                sarcopenia_level: 'E',
                 phone_number: '',
                 address: '',
                 role_id: 3,
@@ -180,7 +207,8 @@ const PatientList = () => {
             case 'A': return 'bg-rose-100 text-rose-700 border-rose-200'; // 最需干預
             case 'B': return 'bg-orange-100 text-orange-700 border-orange-200';
             case 'C': return 'bg-amber-100 text-amber-700 border-amber-200';
-            case 'D': return 'bg-green-100 text-green-700 border-green-200'; // 最健康
+            case 'D':
+            case 'E': return 'bg-green-100 text-green-700 border-green-200'; // 最健康
             default: return 'bg-slate-100 text-slate-700 border-slate-200';
         }
     };
@@ -233,7 +261,7 @@ const PatientList = () => {
             case 'dental':
                 return p.details?.is_dental === true;
             case 'sarcopenia':
-                return p.details?.sarcopenia_level && ['A', 'B', 'C'].includes(p.details.sarcopenia_level);
+                return p.details?.sarcopenia_level && ['A', 'B', 'C', 'D'].includes(p.details.sarcopenia_level);
             default:
                 return true;
         }
@@ -313,7 +341,7 @@ const PatientList = () => {
                     >
                         肌少症風險 ({patients.filter(p => {
                             const inGroup = activeTab === 'all' || (activeTab === 'experimental' && p.role?.name === '實驗組') || (activeTab === 'control' && p.role?.name === '對照組');
-                            return inGroup && p.details?.sarcopenia_level && ['A', 'B', 'C'].includes(p.details.sarcopenia_level);
+                            return inGroup && p.details?.sarcopenia_level && ['A', 'B', 'C', 'D'].includes(p.details.sarcopenia_level);
                         }).length})
                     </button>
                 </div>
@@ -551,10 +579,11 @@ const PatientList = () => {
                                         value={formData.sarcopenia_level}
                                         onChange={(e) => setFormData({ ...formData, sarcopenia_level: e.target.value })}
                                     >
-                                        <option value="A">A 級 (極需干預)</option>
-                                        <option value="B">B 級 (中度風險)</option>
-                                        <option value="C">C 級 (輕度風險)</option>
-                                        <option value="D">D 級 (健康正常)</option>
+                                        <option value="A">A 級</option>
+                                        <option value="B">B 級</option>
+                                        <option value="C">C 級</option>
+                                        <option value="D">D 級</option>
+                                        <option value="E">E 級 (沒有風險)</option>
                                     </select>
                                 </div>
                                 <div className="space-y-1">
@@ -627,42 +656,71 @@ const PatientList = () => {
             {/* Assign Manager Modal */}
             {showAssignModal && assignTargetPatient && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden border border-sky-100 animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-sky-100 animate-in fade-in zoom-in duration-200">
                         <div className="p-6 border-b border-sky-100 bg-sky-50/50 flex justify-between items-center">
                             <div>
                                 <h3 className="text-xl font-bold text-primary">指派個管師</h3>
                                 <p className="text-sm text-text/50 mt-1">對象: {assignTargetPatient.display_name}</p>
                             </div>
-                            <button onClick={() => setShowAssignModal(false)} className="text-text/40 hover:text-text cursor-pointer p-1">
+                            <button
+                                onClick={() => setShowAssignModal(false)}
+                                disabled={isAssigningManagers}
+                                className="text-text/40 hover:text-text cursor-pointer p-1 disabled:opacity-40"
+                            >
                                 <X size={20} />
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-text/70 mb-2">選擇個管師</label>
-                                <select
-                                    value={selectedManagerId}
-                                    onChange={(e) => setSelectedManagerId(e.target.value)}
-                                    className="w-full px-4 py-3 border border-sky-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
-                                >
-                                    <option value="" disabled>請選擇一位管理師...</option>
-                                    {managers.map(m => (
-                                        <option key={m.id} value={m.id}>{m.display_name} (@{m.username})</option>
-                                    ))}
-                                </select>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-sm font-bold text-text/70">選擇個管師</label>
+                                    <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                        已選 {selectedManagerIds.length} 位
+                                    </span>
+                                </div>
+                                <div className="max-h-72 overflow-y-auto rounded-xl border border-sky-100 bg-slate-50 p-2 space-y-1">
+                                    {managers.length === 0 ? (
+                                        <p className="py-6 text-center text-sm text-text/40">目前沒有可指派的個管師</p>
+                                    ) : managers.map(m => {
+                                        const managerId = String(m.id);
+                                        const checked = selectedManagerIds.includes(managerId);
+                                        return (
+                                            <label
+                                                key={m.id}
+                                                className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                                                    checked ? 'bg-primary/5 border-primary/30' : 'bg-white border-transparent hover:border-sky-200'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-4 h-4 rounded text-primary focus:ring-primary/20 cursor-pointer"
+                                                    checked={checked}
+                                                    disabled={isAssigningManagers}
+                                                    onChange={() => toggleSelectedManager(managerId)}
+                                                />
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-text truncate">{m.display_name}</p>
+                                                    <p className="text-xs text-text/40 truncate">@{m.username}</p>
+                                                </div>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
                             </div>
                             <div className="flex space-x-3 pt-2">
                                 <button
                                     onClick={() => setShowAssignModal(false)}
-                                    className="flex-1 py-2.5 px-4 border border-sky-200 text-text/60 rounded-xl font-bold hover:bg-sky-50 transition-colors cursor-pointer"
+                                    disabled={isAssigningManagers}
+                                    className="flex-1 py-2.5 px-4 border border-sky-200 text-text/60 rounded-xl font-bold hover:bg-sky-50 transition-colors cursor-pointer disabled:opacity-50"
                                 >
                                     取消
                                 </button>
                                 <button
                                     onClick={handleAssignManager}
-                                    className="flex-1 py-2.5 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20 cursor-pointer"
+                                    disabled={isAssigningManagers}
+                                    className="flex-1 py-2.5 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    確認指派
+                                    {isAssigningManagers ? '儲存中...' : '儲存指派'}
                                 </button>
                             </div>
                         </div>

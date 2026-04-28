@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, PlayCircle, BookOpen, Brain, Activity, Droplet, Users, X, Loader2, Pill, Utensils, HeartPulse, Sparkles } from 'lucide-react';
 import { managementApi } from '../api/management';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../context/useToast';
 
 const TaskManager = () => {
     const { showToast, requestConfirm } = useToast();
@@ -37,27 +37,35 @@ const TaskManager = () => {
     const [newTaskDesc, setNewTaskDesc] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
 
+    // New categorized states
+    const [mentalMissionTypes, setMentalMissionTypes] = useState([]);
+    const [newTaskSarcopeniaLevel, setNewTaskSarcopeniaLevel] = useState('');
+    const [newTaskMentalTypeId, setNewTaskMentalTypeId] = useState('');
+
     // File Types state
     const [fileTypes, setFileTypes] = useState([]);
     const [allTypeRelations, setAllTypeRelations] = useState([]);
     const [allDataRelations, setAllDataRelations] = useState([]); // 新增這個 state 來存放 data_asset
     const [newTaskFileTypes, setNewTaskFileTypes] = useState([]);
 
-    const fetchMissionsAndPatients = async () => {
+    const fetchMissionsAndPatients = useCallback(async () => {
+        await Promise.resolve();
         setIsLoadingMissions(true);
         try {
-            const [missionsData, patientsData, assignmentsData, typesData, relationsData, dataRelations] = await Promise.all([
+            const [missionsData, patientsData, assignmentsData, typesData, relationsData, dataRelations, mentalTypes] = await Promise.all([
                 managementApi.getMissions(),
                 managementApi.getPatients(),
                 managementApi.getMissionsElective(),
                 managementApi.getFileTypes().catch(() => []),
                 managementApi.getMissionReturnTypeRelations().catch(() => []),
-                managementApi.getMissionDataRelations().catch(() => [])
+                managementApi.getMissionDataRelations().catch(() => []),
+                managementApi.getMentalMissionNames().catch(() => [])
             ]);
             
             if (Array.isArray(typesData)) setFileTypes(typesData);
             if (Array.isArray(relationsData)) setAllTypeRelations(relationsData);
             if (Array.isArray(dataRelations)) setAllDataRelations(dataRelations);
+            if (Array.isArray(mentalTypes)) setMentalMissionTypes(mentalTypes);
             
             if (Array.isArray(missionsData)) {
                 setMissions(missionsData);
@@ -75,9 +83,7 @@ const TaskManager = () => {
                 setAvailableMissionTypes(Object.values(types));
                 
                 // 預設選中第一個領域
-                if (sortedDomains.length > 0 && !activeCategoryId) {
-                    setActiveCategoryId(sortedDomains[0].id);
-                }
+                setActiveCategoryId(current => current || sortedDomains[0]?.id || null);
             }
             if (Array.isArray(patientsData)) setPatients(patientsData);
             if (Array.isArray(assignmentsData)) setAllAssignments(assignmentsData);
@@ -85,11 +91,14 @@ const TaskManager = () => {
             console.error('Failed to fetch data:', error);
         }
         setIsLoadingMissions(false);
-    };
+    }, []);
 
     useEffect(() => {
-        fetchMissionsAndPatients();
-    }, []);
+        const timerId = window.setTimeout(() => {
+            fetchMissionsAndPatients();
+        }, 0);
+        return () => window.clearTimeout(timerId);
+    }, [fetchMissionsAndPatients]);
 
     const combinedTasks = missions
         .filter(m => m.health_domain_id === activeCategoryId)
@@ -129,13 +138,36 @@ const TaskManager = () => {
             const createdMission = await managementApi.createMission(missionData);
             const missionId = createdMission.id;
 
+            // Parallel binding requests
+            const bindings = [];
+
             if (newTaskFileTypes.length > 0 && missionId) {
-                await Promise.all(newTaskFileTypes.map(typeId => 
+                bindings.push(...newTaskFileTypes.map(typeId => 
                     managementApi.createMissionReturnTypeRelation({
                         mission_id: missionId,
                         file_type_id: typeId
-                    }).catch(e => console.error(e))
+                    })
                 ));
+            }
+
+            // 新增：肌少症等級綁定
+            if (newTaskSarcopeniaLevel && missionId) {
+                bindings.push(managementApi.assignSarcopeniaMissionLevel({
+                    id: missionId,
+                    level: newTaskSarcopeniaLevel
+                }));
+            }
+
+            // 新增：心理任務分類綁定
+            if (newTaskMentalTypeId && missionId) {
+                bindings.push(managementApi.assignMentalMissionType({
+                    id: missionId,
+                    type_id: parseInt(newTaskMentalTypeId)
+                }));
+            }
+
+            if (bindings.length > 0) {
+                await Promise.all(bindings.map(p => p.catch(e => console.error('Binding error:', e))));
             }
 
             if (selectedFile && missionId) {
@@ -157,6 +189,8 @@ const TaskManager = () => {
             setNewTaskTitle('');
             setNewTaskDesc('');
             setNewTaskFileTypes([]);
+            setNewTaskSarcopeniaLevel('');
+            setNewTaskMentalTypeId('');
             setSelectedFile(null);
             fetchMissionsAndPatients();
         } catch (error) {
@@ -489,6 +523,40 @@ const TaskManager = () => {
                                     </select>
                                 </div>
                             </div>
+
+                            <div className="grid grid-cols-2 gap-4 p-4 bg-sky-50/50 rounded-xl border border-sky-100/50">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">肌少症等級 (選填)</label>
+                                    <select 
+                                        className="w-full px-4 py-2 border border-sky-100 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={newTaskSarcopeniaLevel}
+                                        onChange={(e) => setNewTaskSarcopeniaLevel(e.target.value)}
+                                    >
+                                        <option value="">-- 無等級 --</option>
+                                        <option value="A">A 級</option>
+                                        <option value="B">B 級</option>
+                                        <option value="C">C 級</option>
+                                        <option value="D">D 級</option>
+                                        <option value="E">E 級 (沒有風險)</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">心理健康分類 (選填)</label>
+                                    <select 
+                                        className="w-full px-4 py-2 border border-sky-100 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={newTaskMentalTypeId}
+                                        onChange={(e) => setNewTaskMentalTypeId(e.target.value)}
+                                    >
+                                        <option value="">-- 無分類 --</option>
+                                        {mentalMissionTypes.map(type => (
+                                            <option key={type.mission_type_id} value={type.mission_type_id}>
+                                                {type.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-bold text-text mb-1">任務描述</label>
                                 <textarea 

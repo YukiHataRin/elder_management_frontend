@@ -3,6 +3,7 @@ import { Search, Filter, AlertTriangle, ArrowRight, Trash2, X } from 'lucide-rea
 import { useNavigate } from 'react-router-dom';
 import { managementApi } from '../api/management';
 import { useToast } from '../context/useToast';
+import { useAuth } from '../context/useAuth';
 
 const PatientList = () => {
     const navigate = useNavigate();
@@ -10,6 +11,7 @@ const PatientList = () => {
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(true);
     const { showToast, requestConfirm } = useToast();
+    const { isAdmin } = useAuth();
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [formData, setFormData] = useState({
@@ -40,7 +42,7 @@ const PatientList = () => {
         try {
             const [patientsData, managersData, missionsData] = await Promise.all([
                 managementApi.getPatients(),
-                managementApi.getBackendUsers(2),
+                isAdmin ? managementApi.getBackendUsers(2) : Promise.resolve([]),
                 managementApi.getMissionsElective()
             ]);
             
@@ -213,24 +215,6 @@ const PatientList = () => {
         }
     };
 
-    const calculateWeeklyProgress = (patientId) => {
-        const userMissions = assignedMissions.filter(m => String(m.user_id) === String(patientId));
-        if (userMissions.length === 0) return 0;
-
-        const thisWeekStart = new Date();
-        thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
-        thisWeekStart.setHours(0, 0, 0, 0);
-
-        const userLogsThisWeek = missionLogs.filter(log =>
-            String(log.user_id) === String(patientId) &&
-            new Date(log.created_at) >= thisWeekStart &&
-            log.mission_status_id === 2
-        );
-
-        const completedUnique = new Set(userLogsThisWeek.map(l => l.mission_id)).size;
-        return Math.min(100, Math.round((completedUnique / userMissions.length) * 100));
-    };
-
     const getIllnessStatusColor = (status) => {
         const s = String(status).toLowerCase();
         if (s.includes('critical') || s.includes('high')) return 'bg-rose-100 text-rose-700 border-rose-200';
@@ -376,7 +360,7 @@ const PatientList = () => {
                                 <th className="py-4 px-6">性別/年齡</th>
                                 <th className="py-4 px-6">肌少症分級</th>
                                 <th className="py-4 px-6">目前個管師</th>
-                                <th className="py-4 px-6">本週進度</th>
+                                <th className="py-4 px-6">健康特徵</th>
                                 <th className="py-4 px-6 text-center">操作</th>
                             </tr>
                         </thead>
@@ -414,24 +398,15 @@ const PatientList = () => {
                                                 {patient.managers.map(m => (
                                                     <span key={m.id} className="text-sm font-bold text-primary flex items-center gap-2">
                                                         {m.display_name}
-                                                        <button onClick={(e) => { e.stopPropagation(); handleUnassignManager(patient.id, m.id); }} className="text-rose-400 hover:text-rose-600 cursor-pointer p-0.5" title="解除指派"><X size={14} /></button>
+                                                        {isAdmin && (
+                                                            <button onClick={(e) => { e.stopPropagation(); handleUnassignManager(patient.id, m.id); }} className="text-rose-400 hover:text-rose-600 cursor-pointer p-0.5" title="解除指派"><X size={14} /></button>
+                                                        )}
                                                     </span>
                                                 ))}
                                             </div>
                                         ) : (
                                             <span className="text-sm text-text/40 italic">尚未指派</span>
                                         )}
-                                    </td>
-                                    <td className="py-4 px-6">
-                                        <div className="flex items-center space-x-3 w-32">
-                                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-500 ${calculateWeeklyProgress(patient.id) >= 100 ? 'bg-cta' : 'bg-primary'}`}
-                                                    style={{ width: `${calculateWeeklyProgress(patient.id)}%` }}
-                                                ></div>
-                                            </div>
-                                            <span className="text-xs font-medium text-text/70 w-8">{calculateWeeklyProgress(patient.id)}%</span>
-                                        </div>
                                     </td>
                                     <td className="py-4 px-6">
                                         {patient.illnesses && patient.illnesses.length > 0 ? (
@@ -447,13 +422,15 @@ const PatientList = () => {
                                         )}
                                     </td>
                                     <td className="py-4 px-6 text-center whitespace-nowrap">
-                                        <button
-                                            onClick={() => handleOpenAssignModal(patient)}
-                                            className="px-3 py-1.5 text-xs font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 rounded-md transition-colors cursor-pointer mr-2"
-                                            title="指派個管師"
-                                        >
-                                            指派個管師
-                                        </button>
+                                        {isAdmin && (
+                                            <button
+                                                onClick={() => handleOpenAssignModal(patient)}
+                                                className="px-3 py-1.5 text-xs font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 rounded-md transition-colors cursor-pointer mr-2"
+                                                title="指派個管師"
+                                            >
+                                                指派個管師
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => navigate(`/patients/${patient.id}`)}
                                             className="inline-flex items-center justify-center p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors cursor-pointer"
@@ -461,13 +438,15 @@ const PatientList = () => {
                                         >
                                             <ArrowRight size={20} />
                                         </button>
-                                        <button
-                                            onClick={(e) => handleDeleteUser(e, patient.id)}
-                                            className="inline-flex items-center justify-center p-2 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer ml-1"
-                                            title="刪除個案"
-                                        >
-                                            <Trash2 size={20} />
-                                        </button>
+                                        {isAdmin && (
+                                            <button
+                                                onClick={(e) => handleDeleteUser(e, patient.id)}
+                                                className="inline-flex items-center justify-center p-2 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer ml-1"
+                                                title="刪除個案"
+                                            >
+                                                <Trash2 size={20} />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

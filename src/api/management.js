@@ -19,6 +19,12 @@ export const managementApi = {
     body: JSON.stringify(data),
   }),
 
+  // 更新目前登入的管理者/個管師密碼
+  updateMyPassword: (password) => apiFetch('/management/me/password', {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
+  }),
+
   // 刪除使用者 (V2: /management/users/{user_id})
   deleteUser: (userId) => apiFetch(`/management/users/${userId}`, {
     method: 'DELETE',

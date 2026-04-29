@@ -1,10 +1,35 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Trophy, Settings, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, KeyRound, LayoutDashboard, Users, ClipboardList, Trophy, Settings, LogOut, X } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
+import { useToast } from '../context/useToast';
+import { managementApi } from '../api/management';
 
 const Layout = ({ children }) => {
     const location = useLocation();
     const { user, isAdmin, isPending, logout } = useAuth();
+    const { showToast } = useToast();
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+    const handleUpdatePassword = async (e) => {
+        e.preventDefault();
+        if (!passwordForm.password) return showToast('請輸入新密碼', 'error');
+        if (passwordForm.password !== passwordForm.confirm) return showToast('兩次輸入的密碼不一致', 'error');
+
+        setIsUpdatingPassword(true);
+        try {
+            await managementApi.updateMyPassword(passwordForm.password);
+            showToast('密碼已更新', 'success');
+            setPasswordForm({ password: '', confirm: '' });
+            setShowPasswordModal(false);
+        } catch (error) {
+            showToast('密碼更新失敗: ' + error.message, 'error');
+        } finally {
+            setIsUpdatingPassword(false);
+        }
+    };
 
     // 如果是待審核角色 (Role 5)，顯示專屬提示頁面，不顯示選單
     if (isPending) {
@@ -91,13 +116,22 @@ const Layout = ({ children }) => {
                         </div>
                     </div>
                     {user && (
-                        <button 
-                            onClick={logout}
-                            className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        >
-                            <LogOut size={16} />
-                            <span>登出系統</span>
-                        </button>
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => setShowPasswordModal(true)}
+                                className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-text/70 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                                <KeyRound size={16} />
+                                <span>修改密碼</span>
+                            </button>
+                            <button 
+                                onClick={logout}
+                                className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                                <LogOut size={16} />
+                                <span>登出系統</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </aside>
@@ -114,6 +148,59 @@ const Layout = ({ children }) => {
                     {children}
                 </div>
             </main>
+            {showPasswordModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-sky-100 bg-white shadow-xl">
+                        <div className="flex items-center justify-between border-b border-sky-100 bg-sky-50/50 px-5 py-4">
+                            <h3 className="font-bold text-primary">修改我的密碼</h3>
+                            <button
+                                onClick={() => setShowPasswordModal(false)}
+                                disabled={isUpdatingPassword}
+                                className="rounded-lg p-1 text-text/40 hover:bg-white hover:text-text disabled:opacity-40"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleUpdatePassword} className="space-y-4 p-5">
+                            <div className="space-y-1">
+                                <label className="ml-1 text-xs font-bold text-text/60">新密碼</label>
+                                <input
+                                    type="password"
+                                    className="w-full rounded-xl border border-sky-100 bg-sky-50/30 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={passwordForm.password}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="ml-1 text-xs font-bold text-text/60">確認新密碼</label>
+                                <input
+                                    type="password"
+                                    className="w-full rounded-xl border border-sky-100 bg-sky-50/30 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={passwordForm.confirm}
+                                    onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPasswordModal(false)}
+                                    disabled={isUpdatingPassword}
+                                    className="flex-1 rounded-xl border border-sky-200 px-4 py-2.5 font-bold text-text/60 hover:bg-sky-50 disabled:opacity-50"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isUpdatingPassword}
+                                    className="flex-1 rounded-xl bg-primary px-4 py-2.5 font-bold text-white hover:bg-primary-light disabled:opacity-50"
+                                >
+                                    {isUpdatingPassword ? '更新中...' : '儲存'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

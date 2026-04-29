@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, Star, Send, Loader2, UserPlus, FileText, Search, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, Star, Send, Loader2, UserPlus, FileText, Search, SlidersHorizontal, RotateCcw, Edit3 } from 'lucide-react';
 import { managementApi } from '../api/management';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
@@ -172,6 +172,22 @@ const PatientDetail = () => {
     const [newNotifTitle, setNewNotifTitle] = useState('');
     const [newNotifContent, setNewNotifContent] = useState('');
     const [isSendingNotif, setIsSendingNotif] = useState(false);
+
+    const [isEditPatientModalOpen, setIsEditPatientModalOpen] = useState(false);
+    const [isSavingPatient, setIsSavingPatient] = useState(false);
+    const [editPatientForm, setEditPatientForm] = useState({
+        username: '',
+        display_name: '',
+        password: '',
+        birthday: '',
+        gender_id: 1,
+        nation_id: '',
+        sarcopenia_level: 'E',
+        phone_number: '',
+        address: '',
+        is_psychiatric: false,
+        is_dental: false
+    });
 
     const getManagerIds = useCallback((user) => (user?.managers || []).map(m => String(m.id)), []);
 
@@ -350,6 +366,62 @@ const PatientDetail = () => {
             fetchDetail();
         } finally {
             setIsAssigning(false);
+        }
+    };
+
+    const handleOpenEditPatient = () => {
+        const details = patient?.details || {};
+        setEditPatientForm({
+            username: patient?.username || '',
+            display_name: patient?.display_name || '',
+            password: '',
+            birthday: details.birthday || '',
+            gender_id: details.gender_id || 1,
+            nation_id: details.nation_id || '',
+            sarcopenia_level: details.sarcopenia_level || 'E',
+            phone_number: details.phone_number || '',
+            address: details.address || '',
+            is_psychiatric: details.is_psychiatric === true,
+            is_dental: details.is_dental === true
+        });
+        setIsEditPatientModalOpen(true);
+    };
+
+    const handleSavePatient = async (e) => {
+        e.preventDefault();
+        if (!editPatientForm.username.trim() || !editPatientForm.display_name.trim()) {
+            return showToast('請輸入姓名與帳號', 'error');
+        }
+
+        const payload = {
+            username: editPatientForm.username.trim(),
+            display_name: editPatientForm.display_name.trim(),
+            details: {
+                birthday: editPatientForm.birthday || null,
+                gender_id: parseInt(editPatientForm.gender_id),
+                nation_id: editPatientForm.nation_id,
+                sarcopenia_level: editPatientForm.sarcopenia_level,
+                phone_number: editPatientForm.phone_number,
+                address: editPatientForm.address,
+                is_psychiatric: editPatientForm.is_psychiatric,
+                is_dental: editPatientForm.is_dental
+            }
+        };
+
+        if (editPatientForm.password.trim()) {
+            payload.password = editPatientForm.password.trim();
+        }
+
+        setIsSavingPatient(true);
+        try {
+            await managementApi.updateUser(id, payload);
+            showToast('個案資料已更新', 'success');
+            setIsEditPatientModalOpen(false);
+            fetchDetail();
+        } catch (error) {
+            showToast('更新失敗: ' + error.message, 'error');
+        } finally {
+            setIsSavingPatient(false);
         }
     };
 
@@ -636,6 +708,13 @@ const PatientDetail = () => {
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-sky-100/50">
                         <h4 className="font-bold text-text mb-4">個管師操作</h4>
                         <div className="space-y-3">
+                            <button
+                                onClick={handleOpenEditPatient}
+                                className="w-full flex items-center justify-center space-x-2 py-2.5 bg-sky-50 text-primary border border-sky-200 rounded-xl font-medium hover:bg-sky-100 transition-colors cursor-pointer text-sm"
+                            >
+                                <Edit3 size={16} />
+                                <span>編輯個案資料/密碼</span>
+                            </button>
                             <button 
                                 onClick={handleOpenAddMission}
                                 className="w-full flex items-center justify-center space-x-2 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors cursor-pointer text-sm"
@@ -1224,6 +1303,164 @@ const PatientDetail = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Edit Patient Modal */}
+            {isEditPatientModalOpen && (
+                <div className="fixed inset-0 bg-text/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 border-b border-sky-100 flex justify-between items-center bg-sky-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-primary font-lora">編輯個案資料</h3>
+                                <p className="text-sm text-text/50 mt-1">密碼留空代表不變更密碼</p>
+                            </div>
+                            <button
+                                onClick={() => setIsEditPatientModalOpen(false)}
+                                disabled={isSavingPatient}
+                                className="text-text/50 hover:text-text transition-colors cursor-pointer p-1 disabled:opacity-40"
+                            >
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSavePatient} className="overflow-y-auto p-6 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">姓名</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.display_name}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, display_name: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">帳號</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 font-mono focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.username}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, username: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">重設密碼</label>
+                                    <input
+                                        type="password"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        placeholder="留空代表不變更"
+                                        value={editPatientForm.password}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, password: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">身分/代碼</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.nation_id}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, nation_id: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">生日</label>
+                                    <input
+                                        type="date"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.birthday}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, birthday: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">性別</label>
+                                    <select
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.gender_id}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, gender_id: e.target.value })}
+                                    >
+                                        <option value={1}>男性</option>
+                                        <option value={2}>女性</option>
+                                        <option value={3}>其他</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">肌少等級</label>
+                                    <select
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.sarcopenia_level}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, sarcopenia_level: e.target.value })}
+                                    >
+                                        {['A', 'B', 'C', 'D', 'E'].map(level => (
+                                            <option key={level} value={level}>{level}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">聯絡電話</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.phone_number}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, phone_number: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-text/60 ml-1">居住地址</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={editPatientForm.address}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, address: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-xl border border-sky-100 bg-sky-50/30 p-4">
+                                <label className="flex items-center gap-3 text-sm font-bold text-text/70">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded text-primary focus:ring-primary/20"
+                                        checked={editPatientForm.is_psychiatric}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, is_psychiatric: e.target.checked })}
+                                    />
+                                    心理問題
+                                </label>
+                                <label className="flex items-center gap-3 text-sm font-bold text-text/70">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded text-primary focus:ring-primary/20"
+                                        checked={editPatientForm.is_dental}
+                                        onChange={(e) => setEditPatientForm({ ...editPatientForm, is_dental: e.target.checked })}
+                                    />
+                                    口腔問題
+                                </label>
+                            </div>
+                            <div className="flex justify-end gap-3 border-t border-sky-100 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditPatientModalOpen(false)}
+                                    disabled={isSavingPatient}
+                                    className="px-5 py-2.5 border border-sky-200 text-text/60 rounded-xl font-bold hover:bg-sky-50 transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingPatient}
+                                    className="px-5 py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSavingPatient ? '儲存中...' : '儲存變更'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Multiple Mission Assignment Modal */}
             {isAddMissionModalOpen && (

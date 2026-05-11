@@ -159,6 +159,9 @@ const PatientDetail = () => {
     const [selectedMissionIds, setSelectedMissionIds] = useState([]);
     const [isCompulsory, setIsCompulsory] = useState(false);
     const [isSubmittingMissions, setIsSubmittingMissions] = useState(false);
+    const [missionAssignSearch, setMissionAssignSearch] = useState('');
+    const [missionAssignDomainFilter, setMissionAssignDomainFilter] = useState('all');
+    const [missionAssignTypeFilter, setMissionAssignTypeFilter] = useState('all');
 
     // Batch Edit states
     const [isEditingMissions, setIsEditingMissions] = useState(false);
@@ -584,6 +587,9 @@ const PatientDetail = () => {
     const handleOpenAddMission = () => {
         setSelectedMissionIds([]);
         setIsCompulsory(false);
+        setMissionAssignSearch('');
+        setMissionAssignDomainFilter('all');
+        setMissionAssignTypeFilter('all');
         setIsAddMissionModalOpen(true);
     };
 
@@ -725,6 +731,31 @@ const PatientDetail = () => {
 
     // Filter out missions that are already assigned
     const availableMissions = allMissions.filter(m => !assignedMissions.some(am => am.mission_id === (m.id || m.mission_id)));
+    const missionAssignDomainOptions = ['all', ...new Map(
+        availableMissions
+            .filter(m => m.health_domain)
+            .map(m => [String(m.health_domain.id), m.health_domain])
+    ).values()];
+    const missionAssignTypeOptions = ['all', ...new Map(
+        availableMissions
+            .filter(m => m.mission_type)
+            .map(m => [String(m.mission_type.id), m.mission_type])
+    ).values()];
+    const filteredAvailableMissions = availableMissions.filter(m => {
+        const keyword = missionAssignSearch.trim().toLowerCase();
+        const matchesKeyword = !keyword || [
+            m.title,
+            m.name,
+            m.description,
+            m.desc,
+            m.detail,
+            m.health_domain?.name,
+            m.mission_type?.name,
+        ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+        const matchesDomain = missionAssignDomainFilter === 'all' || String(m.health_domain_id || m.health_domain?.id) === String(missionAssignDomainFilter);
+        const matchesType = missionAssignTypeFilter === 'all' || String(m.mission_type_id || m.mission_type?.id) === String(missionAssignTypeFilter);
+        return matchesKeyword && matchesDomain && matchesType;
+    });
 
     const details = patient.details || {};
     const questionnaireSubjectId = details.nation_id?.trim();
@@ -1927,14 +1958,14 @@ const PatientDetail = () => {
             {/* Multiple Mission Assignment Modal */}
             {isAddMissionModalOpen && (
                 <div className="fixed inset-0 bg-text/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
                         <div className="px-6 py-4 border-b border-sky-100 flex justify-between items-center bg-sky-50/50">
                             <h3 className="text-xl font-bold text-primary font-lora">指派任務給此病患</h3>
                             <button onClick={() => setIsAddMissionModalOpen(false)} className="text-text/50 hover:text-text transition-colors cursor-pointer p-1">
                                 <XCircle size={20} />
                             </button>
                         </div>
-                        <div className="p-6 space-y-6">
+                        <div className="p-6 space-y-6 overflow-y-auto">
                             <div className="bg-sky-50 p-4 rounded-xl border border-sky-100">
                                 <p className="text-xs text-text/50 font-bold mb-1">指派對象</p>
                                 <p className="font-bold text-text flex items-center space-x-2">
@@ -1964,12 +1995,76 @@ const PatientDetail = () => {
                                     <span>2. 選擇要指派的任務 (可多選)</span>
                                     <span className="text-primary text-xs">已選 {selectedMissionIds.length} 項</span>
                                 </h4>
+
+                                <div className="rounded-xl border border-sky-100 bg-slate-50/70 p-3 space-y-3">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                        <label className="space-y-1 sm:col-span-1">
+                                            <span className="text-[11px] font-bold text-text/50">搜尋任務</span>
+                                            <div className="relative">
+                                                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text/35" />
+                                                <input
+                                                    type="search"
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white pl-9 pr-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    placeholder="名稱、描述、領域"
+                                                    value={missionAssignSearch}
+                                                    onChange={(event) => setMissionAssignSearch(event.target.value)}
+                                                />
+                                            </div>
+                                        </label>
+                                        <label className="space-y-1">
+                                            <span className="text-[11px] font-bold text-text/50">Health Domain</span>
+                                            <select
+                                                className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                value={missionAssignDomainFilter}
+                                                onChange={(event) => setMissionAssignDomainFilter(event.target.value)}
+                                            >
+                                                {missionAssignDomainOptions.map(option => (
+                                                    option === 'all'
+                                                        ? <option key="all" value="all">全部領域</option>
+                                                        : <option key={option.id} value={option.id}>{option.name}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        <label className="space-y-1">
+                                            <span className="text-[11px] font-bold text-text/50">執行模式</span>
+                                            <select
+                                                className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                value={missionAssignTypeFilter}
+                                                onChange={(event) => setMissionAssignTypeFilter(event.target.value)}
+                                            >
+                                                {missionAssignTypeOptions.map(option => (
+                                                    option === 'all'
+                                                        ? <option key="all" value="all">全部模式</option>
+                                                        : <option key={option.id} value={option.id}>{option.name}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs font-bold text-text/45">
+                                        <span>顯示 {filteredAvailableMissions.length} / {availableMissions.length} 項可指派任務</span>
+                                        {(missionAssignSearch || missionAssignDomainFilter !== 'all' || missionAssignTypeFilter !== 'all') && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setMissionAssignSearch('');
+                                                    setMissionAssignDomainFilter('all');
+                                                    setMissionAssignTypeFilter('all');
+                                                }}
+                                                className="text-primary hover:underline"
+                                            >
+                                                清除篩選
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                                 
                                 <div className="max-h-48 overflow-y-auto border border-sky-100 rounded-lg p-2 bg-slate-50">
                                     {availableMissions.length === 0 ? (
                                         <p className="text-xs text-text/40 text-center py-4">目前任務庫尚無資料，或所有任務皆已指派給此病患。</p>
+                                    ) : filteredAvailableMissions.length === 0 ? (
+                                        <p className="text-xs text-text/40 text-center py-4">沒有符合篩選條件的任務。</p>
                                     ) : (
-                                        availableMissions.map(m => (
+                                        filteredAvailableMissions.map(m => (
                                             <label key={m.id || m.mission_id} className="flex items-start space-x-3 p-2 hover:bg-white rounded cursor-pointer transition-colors border-b border-slate-100 last:border-0 hover:shadow-sm">
                                                 <input 
                                                     type="checkbox" 
@@ -1983,7 +2078,14 @@ const PatientDetail = () => {
                                                 />
                                                 <div className="flex-1">
                                                     <span className="text-sm font-bold text-text/80 block">{m.title || m.name || '未命名任務'}</span>
-                                                    <span className="text-text/40 text-[10px] bg-slate-100 px-1 py-0.5 rounded mt-1 inline-block">{m.type || m.category || '一般任務'}</span>
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        <span className="text-text/40 text-[10px] bg-slate-100 px-1 py-0.5 rounded inline-block">
+                                                            {m.health_domain?.name || m.category || '未分類領域'}
+                                                        </span>
+                                                        <span className="text-text/40 text-[10px] bg-slate-100 px-1 py-0.5 rounded inline-block">
+                                                            {m.mission_type?.name || m.type || '一般任務'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </label>
                                         ))

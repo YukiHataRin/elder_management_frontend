@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, PlayCircle, BookOpen, Brain, Activity, Droplet, Users, X, Loader2, Pill, Utensils, HeartPulse, Sparkles } from 'lucide-react';
+import { Plus, Search, BookOpen, Brain, Activity, X, Loader2, Pill, Utensils, HeartPulse, Sparkles } from 'lucide-react';
 import { managementApi } from '../api/management';
 import { useToast } from '../context/useToast';
 
@@ -25,10 +25,15 @@ const TaskManager = () => {
     const [previewUrl, setPreviewUrl] = useState(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
     const [publishTask, setPublishTask] = useState(null);
+    const [taskSearchTerm, setTaskSearchTerm] = useState('');
 
     // Publish form state
     const [selectedPatientIds, setSelectedPatientIds] = useState([]);
     const [isCompulsory, setIsCompulsory] = useState(false);
+    const [publishPatientSearch, setPublishPatientSearch] = useState('');
+    const [publishGenderFilter, setPublishGenderFilter] = useState('all');
+    const [publishAgeMin, setPublishAgeMin] = useState('');
+    const [publishAgeMax, setPublishAgeMax] = useState('');
 
     // New task form state
     const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -102,6 +107,16 @@ const TaskManager = () => {
 
     const combinedTasks = missions
         .filter(m => m.health_domain_id === activeCategoryId)
+        .filter(m => {
+            const keyword = taskSearchTerm.trim().toLowerCase();
+            if (!keyword) return true;
+            return [
+                m.name,
+                m.detail,
+                m.health_domain?.name,
+                m.mission_type?.name,
+            ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+        })
         .map(m => {
             // 尋找此任務的資源綁定
             const relatedData = allDataRelations.find(r => r.mission_id === m.id);
@@ -255,6 +270,10 @@ const TaskManager = () => {
         setPublishTask(task);
         setSelectedPatientIds([]);
         setIsCompulsory(false);
+        setPublishPatientSearch('');
+        setPublishGenderFilter('all');
+        setPublishAgeMin('');
+        setPublishAgeMax('');
     };
 
     const handleOpenEditModal = (mission) => {
@@ -346,6 +365,38 @@ const TaskManager = () => {
         ? allAssignments.filter(a => String(a.mission_id) === String(publishTask.id || publishTask.mission_id)).map(a => a.user_id) 
         : [];
     const availablePatients = patients.filter(p => !alreadyAssignedUserIds.includes(p.id));
+    const calculateAge = (birthday) => {
+        if (!birthday) return null;
+        const birthDate = new Date(birthday);
+        if (Number.isNaN(birthDate.getTime())) return null;
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age -= 1;
+        return age >= 0 ? age : null;
+    };
+    const getPatientGenderValue = (patient) => {
+        const genderName = patient.details?.gender?.name?.toLowerCase();
+        if (genderName === 'male' || patient.details?.gender_id === 1) return 'male';
+        if (genderName === 'female' || patient.details?.gender_id === 2) return 'female';
+        return 'other';
+    };
+    const filteredAvailablePatients = availablePatients.filter(patient => {
+        const keyword = publishPatientSearch.trim().toLowerCase();
+        const age = calculateAge(patient.details?.birthday);
+        const minAge = publishAgeMin === '' ? null : Number(publishAgeMin);
+        const maxAge = publishAgeMax === '' ? null : Number(publishAgeMax);
+        const matchesKeyword = !keyword || [
+            patient.display_name,
+            patient.username,
+            patient.details?.nation_id,
+            patient.details?.phone_number,
+        ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+        const matchesGender = publishGenderFilter === 'all' || getPatientGenderValue(patient) === publishGenderFilter;
+        const matchesMinAge = minAge === null || (age !== null && age >= minAge);
+        const matchesMaxAge = maxAge === null || (age !== null && age <= maxAge);
+        return matchesKeyword && matchesGender && matchesMinAge && matchesMaxAge;
+    });
 
     const getCategoryIcon = (name) => {
         if (!name) return <Sparkles size={18} />;
@@ -404,6 +455,8 @@ const TaskManager = () => {
                             type="text"
                             placeholder="搜尋任務名稱..."
                             className="w-full pl-10 pr-4 py-2 border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                            value={taskSearchTerm}
+                            onChange={(event) => setTaskSearchTerm(event.target.value)}
                         />
                     </div>
                 </div>
@@ -470,6 +523,11 @@ const TaskManager = () => {
                                 </div>
                                 <span className="font-medium text-sm">新增 {dynamicCategories.find(c => c.id === activeCategoryId)?.name || '任務'}</span>
                             </div>
+                            {combinedTasks.length === 0 && (
+                                <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-dashed border-sky-100 bg-sky-50/30 py-10 text-center text-text/40">
+                                    沒有符合搜尋條件的任務
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -744,14 +802,14 @@ const TaskManager = () => {
 
             {publishTask && (
                 <div className="fixed inset-0 bg-text/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
                         <div className="px-6 py-4 border-b border-sky-100 flex justify-between items-center bg-sky-50/50">
                             <h3 className="text-xl font-bold text-primary font-lora">發布與指派任務</h3>
                             <button onClick={() => setPublishTask(null)} className="text-text/50 hover:text-text transition-colors cursor-pointer p-1">
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="p-6 space-y-6">
+                        <div className="p-6 space-y-6 overflow-y-auto">
                             <div className="bg-sky-50 p-4 rounded-xl border border-sky-100">
                                 <p className="text-xs text-text/50 font-bold mb-1">指派目標任務</p>
                                 <p className="font-bold text-text flex items-center space-x-2">
@@ -762,12 +820,84 @@ const TaskManager = () => {
 
                             <div className="space-y-4">
                                 <h4 className="font-bold text-text text-sm border-b border-sky-100 pb-2">選擇指派對象 (病患清單)</h4>
+
+                                <div className="rounded-xl border border-sky-100 bg-slate-50/70 p-3 space-y-3">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                        <label className="space-y-1 sm:col-span-2">
+                                            <span className="text-[11px] font-bold text-text/50">搜尋個案</span>
+                                            <div className="relative">
+                                                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text/35" />
+                                                <input
+                                                    type="search"
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white pl-9 pr-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    placeholder="姓名、帳號、代碼、電話"
+                                                    value={publishPatientSearch}
+                                                    onChange={(event) => setPublishPatientSearch(event.target.value)}
+                                                />
+                                            </div>
+                                        </label>
+                                        <label className="space-y-1">
+                                            <span className="text-[11px] font-bold text-text/50">性別</span>
+                                            <select
+                                                className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                value={publishGenderFilter}
+                                                onChange={(event) => setPublishGenderFilter(event.target.value)}
+                                            >
+                                                <option value="all">全部</option>
+                                                <option value="male">男</option>
+                                                <option value="female">女</option>
+                                                <option value="other">其他/未知</option>
+                                            </select>
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">最小年齡</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={publishAgeMin}
+                                                    onChange={(event) => setPublishAgeMin(event.target.value)}
+                                                />
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">最大年齡</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={publishAgeMax}
+                                                    onChange={(event) => setPublishAgeMax(event.target.value)}
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs font-bold text-text/45">
+                                        <span>顯示 {filteredAvailablePatients.length} / {availablePatients.length} 位可指派個案</span>
+                                        {(publishPatientSearch || publishGenderFilter !== 'all' || publishAgeMin || publishAgeMax) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setPublishPatientSearch('');
+                                                    setPublishGenderFilter('all');
+                                                    setPublishAgeMin('');
+                                                    setPublishAgeMax('');
+                                                }}
+                                                className="text-primary hover:underline"
+                                            >
+                                                清除篩選
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                                 
                                 <div className="max-h-48 overflow-y-auto border border-sky-100 rounded-lg p-2 bg-slate-50">
                                     {availablePatients.length === 0 ? (
                                         <p className="text-xs text-text/40 text-center py-4">所有病患皆已指派此任務，或尚無病患資料。</p>
+                                    ) : filteredAvailablePatients.length === 0 ? (
+                                        <p className="text-xs text-text/40 text-center py-4">沒有符合篩選條件的個案。</p>
                                     ) : (
-                                        availablePatients.map(p => (
+                                        filteredAvailablePatients.map(p => (
                                             <label key={p.id} className="flex items-center space-x-3 p-2 hover:bg-white rounded cursor-pointer transition-colors border-b border-slate-100 last:border-0 hover:shadow-sm">
                                                 <input 
                                                     type="checkbox" 
@@ -778,7 +908,14 @@ const TaskManager = () => {
                                                         else setSelectedPatientIds(selectedPatientIds.filter(id => id !== p.id));
                                                     }}
                                                 />
-                                                <span className="text-sm font-bold text-text/80">{p.display_name} <span className="text-text/40 text-xs font-normal font-mono ml-1">@{p.username}</span></span>
+                                                <span className="text-sm font-bold text-text/80">
+                                                    {p.display_name}
+                                                    <span className="text-text/40 text-xs font-normal font-mono ml-1">@{p.username}</span>
+                                                    <span className="ml-2 text-[10px] font-bold text-text/40">
+                                                        {getPatientGenderValue(p) === 'male' ? '男' : getPatientGenderValue(p) === 'female' ? '女' : '未知'}
+                                                        {calculateAge(p.details?.birthday) !== null ? ` / ${calculateAge(p.details?.birthday)}歲` : ''}
+                                                    </span>
+                                                </span>
                                             </label>
                                         ))
                                     )}

@@ -1,9 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Filter, AlertTriangle, ArrowRight, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { managementApi } from '../api/management';
 import { useToast } from '../context/useToast';
 import { useAuth } from '../context/useAuth';
+
+const attachManagersToPatients = (patientsData, assignmentsData) => {
+    const managersByUserId = new Map();
+    (assignmentsData || []).forEach(assignment => {
+        const userId = String(assignment.user_id);
+        const nextManagers = managersByUserId.get(userId) || [];
+        if (assignment.manager) nextManagers.push(assignment.manager);
+        managersByUserId.set(userId, nextManagers);
+    });
+
+    return (patientsData || []).map(patient => ({
+        ...patient,
+        managers: managersByUserId.get(String(patient.id)) || [],
+    }));
+};
 
 const PatientList = () => {
     const navigate = useNavigate();
@@ -30,23 +45,24 @@ const PatientList = () => {
     });
 
     const [managers, setManagers] = useState([]);
-    const [missionLogs, setMissionLogs] = useState([]);
-    const [assignedMissions, setAssignedMissions] = useState([]);
+    const [, setMissionLogs] = useState([]);
+    const [, setAssignedMissions] = useState([]);
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [assignTargetPatient, setAssignTargetPatient] = useState(null);
     const [selectedManagerIds, setSelectedManagerIds] = useState([]);
     const [isAssigningManagers, setIsAssigningManagers] = useState(false);
 
-    const fetchPatients = async () => {
+    const fetchPatients = useCallback(async () => {
         setLoading(true);
         try {
-            const [patientsData, managersData, missionsData] = await Promise.all([
+            const [patientsData, managersData, missionsData, assignmentsData] = await Promise.all([
                 managementApi.getPatients(),
                 isAdmin ? managementApi.getBackendUsers(2) : Promise.resolve([]),
-                managementApi.getMissionsElective()
+                managementApi.getMissionsElective(),
+                managementApi.getUserManagerAssignments()
             ]);
             
-            setPatients(patientsData || []);
+            setPatients(attachManagersToPatients(patientsData, assignmentsData));
             setManagers(managersData || []);
             setAssignedMissions(missionsData || []);
 
@@ -64,11 +80,11 @@ const PatientList = () => {
             console.error('Failed to fetch data:', error);
         }
         setLoading(false);
-    };
+    }, [isAdmin]);
 
     useEffect(() => {
         fetchPatients();
-    }, []);
+    }, [fetchPatients]);
 
     const getManagerIds = (patient) => (patient?.managers || []).map(m => String(m.id));
 

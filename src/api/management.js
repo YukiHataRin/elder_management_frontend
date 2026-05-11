@@ -60,6 +60,12 @@ export const managementApi = {
   // (超級管理員限定) 查詢特定個管師負責的所有使用者 (V2: /management/manager-assigned/{manager_id})
   getManagerAssignedUsers: (managerId) => apiFetch(`/management/manager-assigned/${managerId}`),
 
+  // 查詢個案與個管師的分配關係 (V2: /management/user-manager-assignments)
+  getUserManagerAssignments: (userId) => {
+    const query = userId ? `?user_id=${userId}` : '';
+    return apiFetch(`/management/user-manager-assignments${query}`);
+  },
+
   // --- 資產管理 (Assets - Shared V2) ---
 
   // 上傳衛教教材 (V2: /assets/)

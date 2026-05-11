@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, Star, Send, Loader2, UserPlus, FileText, Search, SlidersHorizontal, RotateCcw, Edit3 } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, Star, Send, Loader2, UserPlus, FileText, Search, SlidersHorizontal, RotateCcw, Edit3, ClipboardCheck, ClipboardList, Eye, Trash2 } from 'lucide-react';
 import { managementApi } from '../api/management';
+import { formsApi } from '../api/forms';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
 import { apiFetchBlob } from '../api/client'; // Import apiFetchBlob
@@ -131,9 +132,13 @@ const MissionMediaDisplay = ({ assetId, mimeType, assetData }) => {
 const PatientDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { isAdmin } = useAuth();
     const { showToast, requestConfirm } = useToast();
-    const [activeTab, setActiveTab] = useState('tasks');
+    const [activeTab, setActiveTab] = useState(() => {
+        const tab = searchParams.get('tab');
+        return ['tasks', 'health', 'notifications'].includes(tab) ? tab : 'tasks';
+    });
     const [taskSubTab, setTaskSubTab] = useState('assigned'); // 'assigned' or 'history'
     const [patient, setPatient] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -173,6 +178,16 @@ const PatientDetail = () => {
     const [newNotifContent, setNewNotifContent] = useState('');
     const [isSendingNotif, setIsSendingNotif] = useState(false);
 
+    // Questionnaire states
+    const [questionnaireTemplates, setQuestionnaireTemplates] = useState([]);
+    const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
+    const [isQuestionnairesLoading, setIsQuestionnairesLoading] = useState(false);
+    const [isQuestionnaireModalOpen, setIsQuestionnaireModalOpen] = useState(false);
+    const [questionnaireSearch, setQuestionnaireSearch] = useState('');
+    const [questionnaireCategoryFilter, setQuestionnaireCategoryFilter] = useState('all');
+    const [selectedQuestionnaireIds, setSelectedQuestionnaireIds] = useState([]);
+    const [isDispatchingQuestionnaires, setIsDispatchingQuestionnaires] = useState(false);
+
     const [isEditPatientModalOpen, setIsEditPatientModalOpen] = useState(false);
     const [isSavingPatient, setIsSavingPatient] = useState(false);
     const [editPatientForm, setEditPatientForm] = useState({
@@ -195,9 +210,16 @@ const PatientDetail = () => {
         await Promise.resolve();
         setLoading(true);
         try {
-            const data = await managementApi.getPatientDetail(id);
-            setPatient(data);
-            setSelectedManagerIds(getManagerIds(data));
+            const [data, assignments] = await Promise.all([
+                managementApi.getPatientDetail(id),
+                managementApi.getUserManagerAssignments(id)
+            ]);
+            const patientWithManagers = {
+                ...data,
+                managers: (assignments || []).map(assignment => assignment.manager).filter(Boolean)
+            };
+            setPatient(patientWithManagers);
+            setSelectedManagerIds(getManagerIds(patientWithManagers));
         } catch (error) {
             console.error('Failed to fetch patient detail:', error);
         }
@@ -257,6 +279,127 @@ const PatientDetail = () => {
         }
     }, [id]);
 
+    const fetchQuestionnaireData = useCallback(async (nationId) => {
+        await Promise.resolve();
+        setIsQuestionnairesLoading(true);
+        try {
+            const [templates, responses] = await Promise.all([
+                formsApi.listQuestionnaires(),
+                nationId ? formsApi.listSubjectResponses(nationId) : Promise.resolve([])
+            ]);
+
+            setQuestionnaireTemplates(Array.isArray(templates) ? templates : []);
+            setQuestionnaireResponses(
+                Array.isArray(responses)
+                    ? [...responses].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+                    : []
+            );
+        } catch (error) {
+            console.error('Failed to fetch questionnaire data:', error);
+            showToast('載入問卷資料失敗: ' + error.message, 'error');
+        } finally {
+            setIsQuestionnairesLoading(false);
+        }
+    }, [showToast]);
+
+    const handleChangeActiveTab = (tab) => {
+        setActiveTab(tab);
+        if (tab === 'tasks') {
+            setSearchParams({});
+        } else {
+            setSearchParams({ tab });
+        }
+    };
+
+    const getQuestionnaireSubjectId = () => patient?.details?.nation_id?.trim();
+
+    const getDraftForTemplate = (templateId) => questionnaireResponses.find(response => (
+        String(response.template_id) === String(templateId) && response.status === 'draft'
+    ));
+
+    const handleOpenQuestionnaireModal = () => {
+        if (!getQuestionnaireSubjectId()) {
+            showToast('此個案尚未填寫身分/代碼，請先編輯個案資料', 'error');
+            setActiveTab('health');
+            setSearchParams({ tab: 'health' });
+            return;
+        }
+
+        setQuestionnaireSearch('');
+        setQuestionnaireCategoryFilter('all');
+        setSelectedQuestionnaireIds([]);
+        setIsQuestionnaireModalOpen(true);
+    };
+
+    const toggleSelectedQuestionnaire = (templateId) => {
+        setSelectedQuestionnaireIds(prev => (
+            prev.includes(templateId)
+                ? prev.filter(id => id !== templateId)
+                : [...prev, templateId]
+        ));
+    };
+
+    const handleDispatchQuestionnaires = async () => {
+        const nationId = getQuestionnaireSubjectId();
+        if (!nationId) return showToast('請先補上個案身分/代碼', 'error');
+        if (selectedQuestionnaireIds.length === 0) return showToast('請選擇至少一份問卷', 'error');
+
+        setIsDispatchingQuestionnaires(true);
+        try {
+            const today = new Date().toISOString().slice(0, 10);
+            const existingDrafts = selectedQuestionnaireIds
+                .map(templateId => getDraftForTemplate(templateId))
+                .filter(Boolean);
+            const idsToCreate = selectedQuestionnaireIds.filter(templateId => !getDraftForTemplate(templateId));
+
+            const createdResponses = await Promise.all(idsToCreate.map(templateId => formsApi.saveDraft(templateId, {
+                subject_nation_id: nationId,
+                subject_backend_user_id: parseInt(id),
+                answers_json: {
+                    subject_code: nationId,
+                    assessment_date: today
+                }
+            })));
+
+            await fetchQuestionnaireData(nationId);
+            setIsQuestionnaireModalOpen(false);
+            setSelectedQuestionnaireIds([]);
+            setActiveTab('health');
+            setSearchParams({ tab: 'health' });
+
+            if (createdResponses.length > 0 && existingDrafts.length > 0) {
+                showToast(`已派發 ${createdResponses.length} 份問卷，另有 ${existingDrafts.length} 份已有草稿`, 'success');
+            } else if (createdResponses.length > 0) {
+                showToast(`已派發 ${createdResponses.length} 份問卷`, 'success');
+            } else if (existingDrafts.length === 1) {
+                showToast('此問卷已經有草稿，已開啟填寫頁', 'info');
+                const draft = existingDrafts[0];
+                navigate(`/patients/${id}/questionnaires/${draft.template_id}/fill?responseId=${draft.id}`);
+            } else {
+                showToast('選取的問卷皆已有草稿', 'info');
+            }
+        } catch (error) {
+            console.error('Failed to dispatch questionnaires:', error);
+            showToast('派發問卷失敗: ' + error.message, 'error');
+        } finally {
+            setIsDispatchingQuestionnaires(false);
+        }
+    };
+
+    const handleDeleteQuestionnaireDraft = async (responseId) => {
+        const confirmed = await requestConfirm('確定要刪除這份問卷草稿嗎？', '刪除草稿');
+        if (!confirmed) return;
+
+        try {
+            await formsApi.deleteDraft(responseId);
+            showToast('草稿已刪除', 'success');
+            fetchQuestionnaireData(getQuestionnaireSubjectId());
+        } catch (error) {
+            console.error('Failed to delete questionnaire draft:', error);
+            showToast('刪除草稿失敗: ' + error.message, 'error');
+        }
+    };
+
     const handleSendNotification = async (e) => {
         if (e) e.preventDefault();
         if (!newNotifTitle.trim() || !newNotifContent.trim()) {
@@ -313,6 +456,19 @@ const PatientDetail = () => {
         fetchAllMissions();
         fetchNotifications();
     }, [fetchAllMissions, fetchDetail, fetchLogs, fetchManagers, fetchMissions, fetchNotifications]);
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (['tasks', 'health', 'notifications'].includes(tab) && tab !== activeTab) {
+            setActiveTab(tab);
+        }
+    }, [activeTab, searchParams]);
+
+    useEffect(() => {
+        if (patient) {
+            fetchQuestionnaireData(patient.details?.nation_id);
+        }
+    }, [fetchQuestionnaireData, patient]);
 
     const toggleSelectedManager = (managerId) => {
         const value = String(managerId);
@@ -571,6 +727,32 @@ const PatientDetail = () => {
     const availableMissions = allMissions.filter(m => !assignedMissions.some(am => am.mission_id === (m.id || m.mission_id)));
 
     const details = patient.details || {};
+    const questionnaireSubjectId = details.nation_id?.trim();
+    const questionnaireCategoryOptions = ['all', ...new Set(questionnaireTemplates.map(template => template.category || '未分類'))];
+    const filteredQuestionnaireTemplates = questionnaireTemplates.filter(template => {
+        const keyword = questionnaireSearch.trim().toLowerCase();
+        const matchesKeyword = !keyword || [
+            template.title,
+            template.code,
+            template.category,
+            template.sequence_group,
+            template.source_path,
+        ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+
+        const matchesCategory = questionnaireCategoryFilter === 'all' || (template.category || '未分類') === questionnaireCategoryFilter;
+        return matchesKeyword && matchesCategory;
+    });
+    const questionnaireDraftCount = questionnaireResponses.filter(response => response.status === 'draft').length;
+    const questionnaireSubmittedCount = questionnaireResponses.filter(response => response.status === 'submitted').length;
+
+    const getQuestionnaireTemplate = (templateId) => questionnaireTemplates.find(template => String(template.id) === String(templateId));
+
+    const getQuestionnaireStatusMeta = (status) => {
+        if (status === 'submitted') {
+            return { label: '已送出', className: 'bg-green-50 text-green-700 border-green-100' };
+        }
+        return { label: '草稿待填', className: 'bg-amber-50 text-amber-700 border-amber-100' };
+    };
 
     const statusFilterOptions = [
         { value: 'all', label: '全部', count: missionLogs.length },
@@ -720,7 +902,14 @@ const PatientDetail = () => {
                                 className="w-full flex items-center justify-center space-x-2 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors cursor-pointer text-sm"
                             >
                                 <Send size={16} />
-                                <span>派發新任務/問卷</span>
+                                <span>派發新任務</span>
+                            </button>
+                            <button
+                                onClick={handleOpenQuestionnaireModal}
+                                className="w-full flex items-center justify-center space-x-2 py-2.5 bg-cta text-white rounded-xl font-medium hover:bg-green-600 transition-colors cursor-pointer text-sm"
+                            >
+                                <ClipboardCheck size={16} />
+                                <span>派發問卷</span>
                             </button>
                             <button className="w-full flex items-center justify-center space-x-2 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl font-medium hover:bg-rose-100 transition-colors cursor-pointer text-sm">
                                 <Heart size={16} />
@@ -827,19 +1016,19 @@ const PatientDetail = () => {
                         <div className="flex border-b border-sky-100/50">
                             <button
                                 className={`flex-1 py-4 text-center font-bold text-sm transition-colors cursor-pointer ${activeTab === 'tasks' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-text/50 hover:bg-sky-50'}`}
-                                onClick={() => setActiveTab('tasks')}
+                                onClick={() => handleChangeActiveTab('tasks')}
                             >
                                 任務執行紀錄
                             </button>
                             <button
                                 className={`flex-1 py-4 text-center font-bold text-sm transition-colors cursor-pointer ${activeTab === 'health' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-text/50 hover:bg-sky-50'}`}
-                                onClick={() => setActiveTab('health')}
+                                onClick={() => handleChangeActiveTab('health')}
                             >
                                 健康數據與問卷
                             </button>
                             <button
                                 className={`flex-1 py-4 text-center font-bold text-sm transition-colors cursor-pointer ${activeTab === 'notifications' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-text/50 hover:bg-sky-50'}`}
-                                onClick={() => setActiveTab('notifications')}
+                                onClick={() => handleChangeActiveTab('notifications')}
                             >
                                 通知管理
                             </button>
@@ -1294,15 +1483,288 @@ const PatientDetail = () => {
                             </div>
                             )}
                             {activeTab === 'health' && (
-                                <div className="flex flex-col items-center justify-center py-10 text-text/40">
-                                    <Activity size={48} className="mb-4 opacity-50" />
-                                    <p>暫無最新健康評估資料</p>
+                                <div className="space-y-6">
+                                    <div className="flex flex-col gap-4 rounded-2xl border border-sky-100 bg-sky-50/50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-primary flex items-center gap-2">
+                                                <ClipboardList size={20} />
+                                                個案問卷
+                                            </h3>
+                                            <p className="mt-1 text-sm text-text/55">
+                                                以身分/代碼 {questionnaireSubjectId || '未設定'} 查詢草稿與已送出紀錄
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleOpenQuestionnaireModal}
+                                            disabled={!questionnaireSubjectId}
+                                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <ClipboardCheck size={17} />
+                                            派發問卷
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <div className="rounded-2xl border border-sky-100 bg-white p-4">
+                                            <p className="text-xs font-bold text-text/40">問卷庫</p>
+                                            <p className="mt-1 text-2xl font-bold text-primary">{questionnaireTemplates.length}</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+                                            <p className="text-xs font-bold text-amber-700/70">待填草稿</p>
+                                            <p className="mt-1 text-2xl font-bold text-amber-700">{questionnaireDraftCount}</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-green-100 bg-green-50/60 p-4">
+                                            <p className="text-xs font-bold text-green-700/70">已送出</p>
+                                            <p className="mt-1 text-2xl font-bold text-green-700">{questionnaireSubmittedCount}</p>
+                                        </div>
+                                    </div>
+
+                                    {!questionnaireSubjectId && (
+                                        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+                                            此個案尚未填寫身分/代碼，請先點左側「編輯個案資料/密碼」補上身分/代碼後再派發問卷。
+                                        </div>
+                                    )}
+
+                                    {isQuestionnairesLoading ? (
+                                        <div className="flex flex-col items-center justify-center py-10 text-primary">
+                                            <Loader2 size={32} className="animate-spin mb-3" />
+                                            <p>載入問卷紀錄中...</p>
+                                        </div>
+                                    ) : questionnaireResponses.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-sky-100 bg-sky-50/30 py-12 text-text/40">
+                                            <FileText size={48} className="mb-4 text-sky-300 opacity-70" />
+                                            <p className="font-medium">此個案尚未派發或填寫任何問卷</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {questionnaireResponses.map(response => {
+                                                const template = getQuestionnaireTemplate(response.template_id);
+                                                const statusMeta = getQuestionnaireStatusMeta(response.status);
+                                                return (
+                                                    <div key={response.id} className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+                                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                                                    <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${statusMeta.className}`}>
+                                                                        {statusMeta.label}
+                                                                    </span>
+                                                                    <span className="rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-bold text-text/45">
+                                                                        {template?.category || response.template_title || '未分類'}
+                                                                    </span>
+                                                                </div>
+                                                                <h4 className="text-lg font-bold text-text">
+                                                                    {template?.title || response.template_title || `問卷 #${response.template_id}`}
+                                                                </h4>
+                                                                <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-text/45 sm:grid-cols-2">
+                                                                    <p>建立：{formatLogDate(response.created_at)}</p>
+                                                                    <p>更新：{formatLogDate(response.updated_at || response.created_at)}</p>
+                                                                    <p>問卷 ID：{response.template_id}</p>
+                                                                    <p>回覆 ID：{response.id}</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex flex-col gap-2 sm:w-32">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => navigate(`/patients/${id}/questionnaires/${response.template_id}/fill?responseId=${response.id}`)}
+                                                                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-light"
+                                                                >
+                                                                    {response.status === 'submitted' ? <Eye size={16} /> : <Edit3 size={16} />}
+                                                                    {response.status === 'submitted' ? '檢視' : '填寫'}
+                                                                </button>
+                                                                {response.status === 'draft' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteQuestionnaireDraft(response.id)}
+                                                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-100"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                        刪除
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {(response.score_json || response.assessment_result_json) && (
+                                                            <div className="mt-4 rounded-xl border border-green-100 bg-green-50/60 p-3 text-xs text-green-800">
+                                                                <p className="font-bold">評分/評估結果</p>
+                                                                <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-text/65">
+                                                                    {JSON.stringify(response.assessment_result_json || response.score_json, null, 2)}
+                                                                </pre>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Questionnaire Assignment Modal */}
+            {isQuestionnaireModalOpen && (
+                <div className="fixed inset-0 bg-text/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="px-6 py-4 border-b border-sky-100 flex justify-between items-center bg-sky-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-primary font-lora">派發問卷給此個案</h3>
+                                <p className="text-sm text-text/50 mt-1">派發會先建立草稿，之後可由個管師線上填寫</p>
+                            </div>
+                            <button
+                                onClick={() => setIsQuestionnaireModalOpen(false)}
+                                disabled={isDispatchingQuestionnaires}
+                                className="text-text/50 hover:text-text transition-colors cursor-pointer p-1 disabled:opacity-40"
+                            >
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto p-6 space-y-5">
+                            <div className="grid grid-cols-1 gap-3 rounded-xl border border-sky-100 bg-sky-50/50 p-4 sm:grid-cols-2">
+                                <div>
+                                    <p className="text-xs font-bold text-text/45">派發對象</p>
+                                    <p className="mt-1 font-bold text-text">{patient.display_name}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-text/45">身分/代碼</p>
+                                    <p className="mt-1 font-mono font-bold text-primary">{questionnaireSubjectId}</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_220px]">
+                                <label className="space-y-1">
+                                    <span className="text-xs font-bold text-text/50">搜尋問卷</span>
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text/35" />
+                                        <input
+                                            type="search"
+                                            className="w-full min-h-11 rounded-xl border border-sky-100 bg-white pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            placeholder="問卷名稱、分類、代碼"
+                                            value={questionnaireSearch}
+                                            onChange={(event) => setQuestionnaireSearch(event.target.value)}
+                                        />
+                                    </div>
+                                </label>
+                                <label className="space-y-1">
+                                    <span className="text-xs font-bold text-text/50">分類</span>
+                                    <select
+                                        className="w-full min-h-11 rounded-xl border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={questionnaireCategoryFilter}
+                                        onChange={(event) => setQuestionnaireCategoryFilter(event.target.value)}
+                                    >
+                                        {questionnaireCategoryOptions.map(category => (
+                                            <option key={category} value={category}>{category === 'all' ? '全部分類' : category}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </div>
+
+                            <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+                                <p className="text-sm font-bold text-text/60">
+                                    可派發問卷 {filteredQuestionnaireTemplates.length} 份
+                                </p>
+                                <p className="text-sm font-bold text-primary">已選 {selectedQuestionnaireIds.length} 份</p>
+                            </div>
+
+                            {isQuestionnairesLoading ? (
+                                <div className="flex items-center justify-center py-12 text-primary">
+                                    <Loader2 size={28} className="animate-spin mr-2" />
+                                    載入問卷庫中...
+                                </div>
+                            ) : filteredQuestionnaireTemplates.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-sky-100 bg-sky-50/40 py-10 text-center text-text/40">
+                                    沒有符合條件的問卷
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-3">
+                                    {filteredQuestionnaireTemplates.map(template => {
+                                        const existingDraft = getDraftForTemplate(template.id);
+                                        const checked = selectedQuestionnaireIds.includes(template.id);
+                                        return (
+                                            <div
+                                                key={template.id}
+                                                className={`rounded-xl border p-4 transition-colors ${
+                                                    checked
+                                                        ? 'border-primary bg-primary/5'
+                                                        : 'border-sky-100 bg-white hover:border-primary/30'
+                                                }`}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    {!existingDraft && (
+                                                        <input
+                                                            type="checkbox"
+                                                            className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary/20"
+                                                            checked={checked}
+                                                            disabled={isDispatchingQuestionnaires}
+                                                            onChange={() => toggleSelectedQuestionnaire(template.id)}
+                                                        />
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="mb-2 flex flex-wrap gap-2">
+                                                            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-primary">
+                                                                {template.category || '未分類'}
+                                                            </span>
+                                                            {template.sequence_group && (
+                                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-text/45">
+                                                                    {template.sequence_group}
+                                                                </span>
+                                                            )}
+                                                            {template.has_scoring && (
+                                                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                                                                    含評分
+                                                                </span>
+                                                            )}
+                                                            {existingDraft && (
+                                                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                                                                    已有草稿
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="font-bold text-text">{template.title}</h4>
+                                                        <p className="mt-1 text-xs text-text/45">
+                                                            {template.source_file_type?.toUpperCase()} / {template.extraction_status} / ID {template.id}
+                                                        </p>
+                                                    </div>
+                                                    {existingDraft && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => navigate(`/patients/${id}/questionnaires/${template.id}/fill?responseId=${existingDraft.id}`)}
+                                                            className="shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-light"
+                                                        >
+                                                            填寫草稿
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-sky-100 flex flex-col gap-3 bg-slate-50 sm:flex-row sm:justify-end">
+                            <button
+                                onClick={() => setIsQuestionnaireModalOpen(false)}
+                                disabled={isDispatchingQuestionnaires}
+                                className="min-h-11 px-5 py-2 text-text/70 font-bold hover:bg-slate-200 rounded-xl transition-colors cursor-pointer border border-slate-200 bg-white disabled:opacity-50"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleDispatchQuestionnaires}
+                                disabled={isDispatchingQuestionnaires || selectedQuestionnaireIds.length === 0}
+                                className="min-h-11 px-5 py-2 font-bold rounded-xl transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2 bg-primary text-white hover:bg-primary-light disabled:bg-slate-300 disabled:cursor-not-allowed"
+                            >
+                                {isDispatchingQuestionnaires ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
+                                確認派發
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Edit Patient Modal */}
             {isEditPatientModalOpen && (

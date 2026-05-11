@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle, FileText } from 'lucide-react';
 import { getQuestionnaireFieldGroups } from '../utils/questionnaire';
 
-const fieldBaseClass = 'w-full min-h-11 rounded-xl border border-sky-100 bg-white px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-slate-50 disabled:text-text/40';
+const fieldBaseClass = 'w-full min-h-11 rounded-xl border border-sky-100 bg-white px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-default disabled:border-sky-100 disabled:bg-white disabled:text-text disabled:opacity-100';
 
 const cleanOptionLabel = (value) => value
   .replace(/^[\s:：;；,，、/|]+/, '')
@@ -53,7 +53,7 @@ const FieldInput = ({ field, value, onChange, disabled }) => {
 
   if (field.type === 'acknowledgement') {
     return (
-      <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 text-sm font-bold text-text/75">
+      <label className={`flex min-h-12 items-center gap-3 rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 text-sm font-bold text-text/75 ${disabled ? 'cursor-default' : 'cursor-pointer'}`}>
         <input
           id={field.id}
           type="checkbox"
@@ -79,7 +79,7 @@ const FieldInput = ({ field, value, onChange, disabled }) => {
             type="button"
             disabled={disabled}
             onClick={() => onChange(field.id, option.value)}
-            className={`min-h-11 rounded-xl border px-4 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`min-h-11 rounded-xl border px-4 py-2 text-sm font-bold transition-colors disabled:cursor-default disabled:opacity-100 ${
               value === option.value
                 ? 'border-primary bg-primary text-white'
                 : 'border-sky-100 bg-white text-text/60 hover:border-primary/30 hover:text-primary'
@@ -98,7 +98,7 @@ const FieldInput = ({ field, value, onChange, disabled }) => {
         {options.map(option => (
           <label
             key={option.value}
-            className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
+            className={`flex min-h-11 items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${disabled ? 'cursor-default' : 'cursor-pointer'} ${
               String(value ?? '') === option.value
                 ? 'border-primary bg-primary/5 text-primary'
                 : 'border-sky-100 bg-white text-text/70 hover:border-primary/30'

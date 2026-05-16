@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Cloud, CloudOff, FileText, Loader2, Save, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Cloud, CloudOff, Download, FileText, Loader2, Save, Send } from 'lucide-react';
 import QuestionnaireFormRenderer from '../components/QuestionnaireFormRenderer';
 import { getQuestionnaireFields } from '../utils/questionnaire';
+import { downloadBlob, sanitizeFilename } from '../utils/download';
 import { formsApi } from '../api/forms';
 import { managementApi } from '../api/management';
 import { useToast } from '../context/useToast';
@@ -489,6 +490,22 @@ const QuestionnaireFill = () => {
     }
   };
 
+  const handleDownloadXlsx = async () => {
+    if (!isSubmitted || !response?.id) {
+      showToast('只有已送出的問卷可以下載 XLSX', 'error');
+      return;
+    }
+
+    try {
+      const blob = await formsApi.downloadResponseXlsx(response.id);
+      const templateTitle = questionnaire?.title || `問卷_${templateId}`;
+      downloadBlob(blob, `${sanitizeFilename(templateTitle)}_回覆${response.id}.xlsx`);
+    } catch (error) {
+      console.error('Failed to download questionnaire xlsx:', error);
+      showToast('下載問卷 XLSX 失敗: ' + error.message, 'error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 text-primary">
@@ -589,6 +606,16 @@ const QuestionnaireFill = () => {
             {isSubmitted ? '此問卷已送出，內容僅供檢視' : canEditResponse ? '可先儲存草稿，確認後再正式送出' : '此草稿由其他個管師派發，內容僅供檢視'}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
+            {isSubmitted && (
+              <button
+                type="button"
+                onClick={handleDownloadXlsx}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-100 bg-green-50 px-5 py-2.5 text-sm font-bold text-green-700 transition-colors hover:bg-green-100"
+              >
+                <Download size={17} />
+                下載 XLSX
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSaveDraft}

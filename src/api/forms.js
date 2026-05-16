@@ -37,6 +37,30 @@ const formsFetch = async (endpoint, options = {}) => {
   return response.json();
 };
 
+const formsFetchBlob = async (endpoint, options = {}) => {
+  const response = await fetch(`${FORMS_API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      ...getHeaders(),
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Questionnaire file request failed');
+  }
+
+  return response.blob();
+};
+
 export const formsApi = {
   listQuestionnaires: () => formsFetch('/questionnaires'),
 
@@ -84,6 +108,8 @@ export const formsApi = {
   },
 
   getResponse: (responseId) => formsFetch(`/responses/${responseId}`),
+
+  downloadResponseXlsx: (responseId) => formsFetchBlob(`/responses/${responseId}/xlsx`),
 
   deleteDraft: (responseId) => formsFetch(`/responses/${responseId}/draft`, {
     method: 'DELETE',

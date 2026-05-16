@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, Eye, FileText, Loader2, Search } from 'lucide-react';
+import { ClipboardList, Download, Eye, FileText, Loader2, Search } from 'lucide-react';
 import { formsApi } from '../api/forms';
 import { useToast } from '../context/useToast';
+import { downloadBlob, sanitizeFilename } from '../utils/download';
 
 const formatDateTime = (value) => {
   if (!value) return '尚未記錄';
@@ -106,6 +107,22 @@ const QuestionnaireManager = () => {
   const selectedTemplate = templates.find(template => String(template.id) === String(selectedTemplateId));
   const submittedCount = responses.filter(response => response.status === 'submitted').length;
   const draftCount = responses.filter(response => response.status === 'draft').length;
+
+  const handleDownloadXlsx = async (response) => {
+    if (response.status !== 'submitted') {
+      showToast('只有已送出的問卷可以下載 XLSX', 'error');
+      return;
+    }
+
+    try {
+      const blob = await formsApi.downloadResponseXlsx(response.id);
+      const templateTitle = selectedTemplate?.title || response.template_title || `問卷_${response.template_id}`;
+      downloadBlob(blob, `${sanitizeFilename(templateTitle)}_回覆${response.id}.xlsx`);
+    } catch (error) {
+      console.error('Failed to download questionnaire xlsx:', error);
+      showToast('下載問卷 XLSX 失敗: ' + error.message, 'error');
+    }
+  };
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -237,7 +254,7 @@ const QuestionnaireManager = () => {
               </div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-sky-100">
-                <div className="hidden grid-cols-[1.4fr_1fr_1fr_1fr_120px] gap-3 border-b border-sky-100 bg-sky-50/70 px-4 py-3 text-xs font-bold text-text/45 lg:grid">
+                <div className="hidden grid-cols-[1.4fr_1fr_1fr_1fr_170px] gap-3 border-b border-sky-100 bg-sky-50/70 px-4 py-3 text-xs font-bold text-text/45 lg:grid">
                   <span>個案</span>
                   <span>狀態</span>
                   <span>個管師</span>
@@ -248,7 +265,7 @@ const QuestionnaireManager = () => {
                   {filteredResponses.map(response => {
                     const meta = statusMeta(response.status);
                     return (
-                      <div key={response.id} className="grid grid-cols-1 gap-3 px-4 py-4 text-sm lg:grid-cols-[1.4fr_1fr_1fr_1fr_120px] lg:items-center">
+                      <div key={response.id} className="grid grid-cols-1 gap-3 px-4 py-4 text-sm lg:grid-cols-[1.4fr_1fr_1fr_1fr_170px] lg:items-center">
                         <div>
                           <p className="font-bold text-text">{response.subject_display_name || `個案 #${response.subject_backend_user_id || '-'}`}</p>
                           <p className="mt-1 text-xs text-text/45">身分/代碼：{response.subject_nation_id}</p>
@@ -264,7 +281,17 @@ const QuestionnaireManager = () => {
                           <p>建立：{formatDateTime(response.created_at)}</p>
                           <p className="mt-1">更新：{formatDateTime(response.updated_at || response.created_at)}</p>
                         </div>
-                        <div className="flex justify-end">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {response.status === 'submitted' && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadXlsx(response)}
+                              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-green-100 bg-green-50 px-3 py-2 text-sm font-bold text-green-700 hover:bg-green-100"
+                            >
+                              <Download size={16} />
+                              XLSX
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => navigate(`/patients/${response.subject_backend_user_id}/questionnaires/${response.template_id}/fill?responseId=${response.id}`)}

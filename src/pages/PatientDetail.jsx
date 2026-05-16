@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, Star, Send, Loader2, UserPlus, FileText, Search, SlidersHorizontal, RotateCcw, Edit3, ClipboardCheck, ClipboardList, Eye, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, Star, Send, Loader2, UserPlus, FileText, Search, SlidersHorizontal, RotateCcw, Edit3, ClipboardCheck, ClipboardList, Eye, Trash2, Download } from 'lucide-react';
 import { managementApi } from '../api/management';
 import { formsApi } from '../api/forms';
 import { getQuestionnaireFieldGroups } from '../utils/questionnaire';
+import { downloadBlob, sanitizeFilename } from '../utils/download';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
 import { apiFetchBlob } from '../api/client'; // Import apiFetchBlob
@@ -516,6 +517,22 @@ const PatientDetail = () => {
         } catch (error) {
             console.error('Failed to delete questionnaire draft:', error);
             showToast('刪除草稿失敗: ' + error.message, 'error');
+        }
+    };
+
+    const handleDownloadQuestionnaireXlsx = async (response, template) => {
+        if (response.status !== 'submitted') {
+            showToast('只有已送出的問卷可以下載 XLSX', 'error');
+            return;
+        }
+
+        try {
+            const blob = await formsApi.downloadResponseXlsx(response.id);
+            const templateTitle = template?.title || response.template_title || `問卷_${response.template_id}`;
+            downloadBlob(blob, `${sanitizeFilename(templateTitle)}_回覆${response.id}.xlsx`);
+        } catch (error) {
+            console.error('Failed to download questionnaire xlsx:', error);
+            showToast('下載問卷 XLSX 失敗: ' + error.message, 'error');
         }
     };
 
@@ -1797,6 +1814,16 @@ const PatientDetail = () => {
                                                                     >
                                                                         {comparingResponseId === response.id ? <Loader2 size={16} className="animate-spin" /> : <SlidersHorizontal size={16} />}
                                                                         比對其他
+                                                                    </button>
+                                                                )}
+                                                                {response.status === 'submitted' && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDownloadQuestionnaireXlsx(response, template)}
+                                                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-green-100 bg-green-50 px-3 py-2 text-sm font-bold text-green-700 transition-colors hover:bg-green-100"
+                                                                    >
+                                                                        <Download size={16} />
+                                                                        XLSX
                                                                     </button>
                                                                 )}
                                                                 {response.status === 'draft' && canEditResponse && (

@@ -126,6 +126,41 @@ const FieldInput = ({ field, value, onChange, disabled }) => {
     );
   }
 
+  if (field.type === 'multiple_choice' && options.length > 0) {
+    const selectedValues = Array.isArray(value) ? value.map(item => String(item)) : [];
+    const toggleOption = (optionValue) => {
+      const optionString = String(optionValue);
+      const nextValues = selectedValues.includes(optionString)
+        ? selectedValues.filter(item => item !== optionString)
+        : [...selectedValues, optionString];
+      onChange(field.id, nextValues);
+    };
+
+    return (
+      <div className="space-y-2" role="group" aria-label={field.label || field.id}>
+        {options.map(option => (
+          <label
+            key={option.value}
+            className={`flex min-h-11 items-start gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${disabled ? 'cursor-default' : 'cursor-pointer'} ${
+              selectedValues.includes(option.value)
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-sky-100 bg-white text-text/70 hover:border-primary/30'
+            }`}
+          >
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded text-primary focus:ring-primary/20"
+              checked={selectedValues.includes(option.value)}
+              disabled={disabled}
+              onChange={() => toggleOption(option.value)}
+            />
+            <span className="flex-1 leading-relaxed">{option.label}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
   if (field.type === 'date') {
     return (
       <input

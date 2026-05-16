@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { Clock, KeyRound, LayoutDashboard, Users, ClipboardList, Trophy, Settings, LogOut, X } from 'lucide-react';
+import { Clock, KeyRound, LayoutDashboard, Users, ClipboardList, Trophy, Settings, LogOut, X, FileText } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
 import { managementApi } from '../api/management';
@@ -58,6 +58,7 @@ const Layout = ({ children }) => {
 
     const navItems = [
         { path: '/patients', label: '個案管理', icon: <Users size={20} /> },
+        { path: '/questionnaires', label: '問卷管理', icon: <FileText size={20} /> },
         { path: '/tasks', label: '任務庫管理', icon: <ClipboardList size={20} /> },
         { path: '/gamification', label: '內生激勵與排名', icon: <Trophy size={20} /> },
     ];

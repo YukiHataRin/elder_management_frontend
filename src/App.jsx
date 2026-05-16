@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import PatientList from './pages/PatientList';
 import PatientDetail from './pages/PatientDetail';
 import QuestionnaireFill from './pages/QuestionnaireFill';
+import QuestionnaireManager from './pages/QuestionnaireManager';
 import TaskManager from './pages/TaskManager';
 import Gamification from './pages/Gamification';
 import BackendUserManagement from './pages/BackendUserManagement';
@@ -41,6 +42,7 @@ function App() {
           <Route path="/patients" element={<ProtectedRoute><PatientList /></ProtectedRoute>} />
           <Route path="/patients/:id" element={<ProtectedRoute><PatientDetail /></ProtectedRoute>} />
           <Route path="/patients/:id/questionnaires/:templateId/fill" element={<ProtectedRoute><QuestionnaireFill /></ProtectedRoute>} />
+          <Route path="/questionnaires" element={<ProtectedRoute><QuestionnaireManager /></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute><TaskManager /></ProtectedRoute>} />
           <Route path="/gamification" element={<ProtectedRoute><Gamification /></ProtectedRoute>} />
           

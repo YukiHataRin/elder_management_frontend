@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Download, Eye, FileText, Loader2, Search } from 'lucide-react';
 import { formsApi } from '../api/forms';
 import { useToast } from '../context/useToast';
-import { downloadBlob, sanitizeFilename } from '../utils/download';
+import { buildQuestionnaireXlsxFilename, downloadBlob } from '../utils/download';
 
 const formatDateTime = (value) => {
   if (!value) return '尚未記錄';
@@ -116,8 +116,12 @@ const QuestionnaireManager = () => {
 
     try {
       const blob = await formsApi.downloadResponseXlsx(response.id);
-      const templateTitle = selectedTemplate?.title || response.template_title || `問卷_${response.template_id}`;
-      downloadBlob(blob, `${sanitizeFilename(templateTitle)}_回覆${response.id}.xlsx`);
+      downloadBlob(blob, buildQuestionnaireXlsxFilename({
+        subjectName: response.subject_display_name,
+        subjectNationId: response.subject_nation_id,
+        templateTitle: selectedTemplate?.title || response.template_title || `問卷_${response.template_id}`,
+        submittedAt: response.submitted_at,
+      }));
     } catch (error) {
       console.error('Failed to download questionnaire xlsx:', error);
       showToast('下載問卷 XLSX 失敗: ' + error.message, 'error');

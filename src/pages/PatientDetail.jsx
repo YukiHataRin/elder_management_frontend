@@ -4,7 +4,7 @@ import { ArrowLeft, User, Phone, MapPin, Activity, CheckCircle, XCircle, Heart, 
 import { managementApi } from '../api/management';
 import { formsApi } from '../api/forms';
 import { getQuestionnaireFieldGroups } from '../utils/questionnaire';
-import { downloadBlob, sanitizeFilename } from '../utils/download';
+import { buildQuestionnaireXlsxFilename, downloadBlob } from '../utils/download';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
 import { apiFetchBlob } from '../api/client'; // Import apiFetchBlob
@@ -528,8 +528,12 @@ const PatientDetail = () => {
 
         try {
             const blob = await formsApi.downloadResponseXlsx(response.id);
-            const templateTitle = template?.title || response.template_title || `問卷_${response.template_id}`;
-            downloadBlob(blob, `${sanitizeFilename(templateTitle)}_回覆${response.id}.xlsx`);
+            downloadBlob(blob, buildQuestionnaireXlsxFilename({
+                subjectName: patient?.display_name,
+                subjectNationId: response.subject_nation_id || patient?.details?.nation_id,
+                templateTitle: template?.title || response.template_title || `問卷_${response.template_id}`,
+                submittedAt: response.submitted_at,
+            }));
         } catch (error) {
             console.error('Failed to download questionnaire xlsx:', error);
             showToast('下載問卷 XLSX 失敗: ' + error.message, 'error');

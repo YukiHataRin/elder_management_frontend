@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Cloud, CloudOff, Download, FileText, Loader2, Save, Send } from 'lucide-react';
 import QuestionnaireFormRenderer from '../components/QuestionnaireFormRenderer';
 import { getQuestionnaireFields } from '../utils/questionnaire';
-import { downloadBlob, sanitizeFilename } from '../utils/download';
+import { buildQuestionnaireXlsxFilename, downloadBlob } from '../utils/download';
 import { formsApi } from '../api/forms';
 import { managementApi } from '../api/management';
 import { useToast } from '../context/useToast';
@@ -498,8 +498,12 @@ const QuestionnaireFill = () => {
 
     try {
       const blob = await formsApi.downloadResponseXlsx(response.id);
-      const templateTitle = questionnaire?.title || `問卷_${templateId}`;
-      downloadBlob(blob, `${sanitizeFilename(templateTitle)}_回覆${response.id}.xlsx`);
+      downloadBlob(blob, buildQuestionnaireXlsxFilename({
+        subjectName: patient?.display_name,
+        subjectNationId,
+        templateTitle: questionnaire?.title || `問卷_${templateId}`,
+        submittedAt: response.submitted_at,
+      }));
     } catch (error) {
       console.error('Failed to download questionnaire xlsx:', error);
       showToast('下載問卷 XLSX 失敗: ' + error.message, 'error');

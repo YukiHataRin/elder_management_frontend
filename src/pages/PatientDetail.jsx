@@ -180,6 +180,15 @@ const getQuestionnaireScoreSummary = (response) => {
     return parts.join(' / ');
 };
 
+const getQuestionnaireFillerLabel = (response) => {
+    if (!response) return '尚未記錄';
+    const name = response.filled_by_display_name;
+    const username = response.filled_by_username;
+    const role = response.filled_by_role_name;
+    const identity = [name, username ? `@${username}` : null].filter(Boolean).join(' ');
+    return [identity || `使用者 #${response.filled_by_user_id}`, role].filter(Boolean).join(' / ');
+};
+
 
 const PatientDetail = () => {
     const { id } = useParams();
@@ -1722,7 +1731,7 @@ const PatientDetail = () => {
                                                         {questionnaireComparison.comparedResponses.map((item, index) => (
                                                             <div key={item.id} className={`rounded-xl border px-3 py-2 text-xs ${index === 0 ? 'border-primary/20 bg-primary/5 text-primary' : 'border-slate-100 bg-slate-50 text-text/50'}`}>
                                                                 <p className="font-bold">{index === 0 ? '本筆紀錄' : '其他個管師'}</p>
-                                                                <p className="mt-1">回覆 #{item.id} / 個管師 ID {item.filled_by_user_id}</p>
+                                                                <p className="mt-1">回覆 #{item.id} / {getQuestionnaireFillerLabel(item)}</p>
                                                                 <p className="mt-1">狀態：{getQuestionnaireStatusMeta(item.status).label}</p>
                                                             </div>
                                                         ))}
@@ -1745,7 +1754,7 @@ const PatientDetail = () => {
                                                                         {row.values.map((value, index) => (
                                                                             <div key={`${row.field_id}-${value.response_id}`} className="rounded-lg border border-white bg-white px-3 py-2">
                                                                                 <p className="text-[11px] font-bold text-text/40">
-                                                                                    {index === 0 ? '本筆' : '其他'} / 回覆 #{value.response_id} / 個管師 ID {value.filled_by_user_id}
+                                                                                    {index === 0 ? '本筆' : '其他'} / 回覆 #{value.response_id} / {getQuestionnaireFillerLabel(value)}
                                                                                 </p>
                                                                                 <p className="mt-1 text-sm font-bold text-text">{value.display_value}</p>
                                                                             </div>
@@ -1797,7 +1806,7 @@ const PatientDetail = () => {
                                                                     <p>更新：{formatLogDate(response.updated_at || response.created_at)}</p>
                                                                     <p>問卷 ID：{response.template_id}</p>
                                                                     <p>回覆 ID：{response.id}</p>
-                                                                    <p>個管師 ID：{response.filled_by_user_id}</p>
+                                                                    <p>填答者：{getQuestionnaireFillerLabel(response)}</p>
                                                                 </div>
                                                             </div>
                                                             <div className="flex flex-col gap-2 sm:w-32">

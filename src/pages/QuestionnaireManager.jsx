@@ -22,6 +22,14 @@ const statusMeta = (status) => (
     : { label: '草稿', className: 'border-amber-100 bg-amber-50 text-amber-700' }
 );
 
+const getFillerLabel = (response) => {
+  const name = response.filled_by_display_name;
+  const username = response.filled_by_username;
+  const role = response.filled_by_role_name;
+  const identity = [name, username ? `@${username}` : null].filter(Boolean).join(' ');
+  return [identity || `使用者 #${response.filled_by_user_id}`, role].filter(Boolean).join(' / ');
+};
+
 const QuestionnaireManager = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -280,7 +288,7 @@ const QuestionnaireManager = () => {
                             {meta.label}
                           </span>
                         </div>
-                        <p className="text-text/55">個管師 ID {response.filled_by_user_id}</p>
+                        <p className="text-text/55">{getFillerLabel(response)}</p>
                         <div className="text-xs text-text/45">
                           <p>建立：{formatDateTime(response.created_at)}</p>
                           <p className="mt-1">更新：{formatDateTime(response.updated_at || response.created_at)}</p>

@@ -19,7 +19,7 @@ const LOCAL_DRAFT_MAX_AGE_MS = LOCAL_DRAFT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
 const getDraftStorageKey = ({ responseId, patientId, templateId, userId }) => (
   responseId
-    ? `${LOCAL_DRAFT_PREFIX}response:${responseId}`
+    ? `${LOCAL_DRAFT_PREFIX}response:${responseId}:patient:${patientId}:user:${userId || 'unknown'}`
     : `${LOCAL_DRAFT_PREFIX}new:${patientId}:${templateId}:${userId || 'unknown'}`
 );
 
@@ -106,18 +106,65 @@ const formatDateTime = (value) => {
   });
 };
 
-const JsonSummary = ({ title, data }) => {
-  if (!data || Object.keys(data).length === 0) return null;
+const formatScoreValue = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const numberValue = Number(value);
+  if (Number.isFinite(numberValue)) {
+    return numberValue.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+  }
+  return String(value);
+};
+
+const ScoreSummary = ({ questionnaire, scoreJson, assessmentResultJson }) => {
+  const hasScore = scoreJson && Object.keys(scoreJson).length > 0;
+  const hasAssessment = assessmentResultJson && Object.keys(assessmentResultJson).length > 0;
+  if (!hasScore && !hasAssessment) return null;
+
+  const fields = getQuestionnaireFields(questionnaire);
+  const fieldLabels = Object.fromEntries(fields.map(field => [field.id, field.label || field.id]));
+  const totalScore = formatScoreValue(scoreJson?.total_score);
+  const interpretation = scoreJson?.interpretation || assessmentResultJson?.summary || assessmentResultJson?.interpretation;
+  const fieldScores = Array.isArray(scoreJson?.fields) ? scoreJson.fields : [];
 
   return (
     <div className="rounded-2xl border border-green-100 bg-green-50/70 p-4">
-      <div className="mb-2 flex items-center gap-2 text-sm font-bold text-green-800">
+      <div className="mb-3 flex items-center gap-2 text-sm font-bold text-green-800">
         <CheckCircle size={17} />
-        {title}
+        評分結果
       </div>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-xl bg-white p-3 text-xs leading-relaxed text-text/70">
-        {JSON.stringify(data, null, 2)}
-      </pre>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {totalScore !== null && (
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-xs font-bold text-text/45">總分</p>
+            <p className="mt-1 text-2xl font-bold text-green-800">{totalScore} 分</p>
+          </div>
+        )}
+        {interpretation && (
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-xs font-bold text-text/45">判讀</p>
+            <p className="mt-1 text-lg font-bold text-green-800">{interpretation}</p>
+          </div>
+        )}
+      </div>
+      {fieldScores.length > 0 && (
+        <div className="mt-3 overflow-hidden rounded-xl border border-green-100 bg-white">
+          <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-green-100 px-3 py-2 text-xs font-bold text-text/45">
+            <span>項目</span>
+            <span>得分</span>
+          </div>
+          <div className="divide-y divide-green-50">
+            {fieldScores.map(item => {
+              const score = formatScoreValue(item.score);
+              return (
+                <div key={item.field_id} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2 text-sm">
+                  <span className="text-text/75">{fieldLabels[item.field_id] || item.field_id}</span>
+                  <span className="font-bold text-green-800">{score !== null ? `${score} 分` : '未計分'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -218,9 +265,17 @@ const QuestionnaireFill = () => {
         responseId ? formsApi.getResponse(responseId) : Promise.resolve(null),
       ]);
 
+      if (responseData && String(responseData.subject_backend_user_id) !== String(id)) {
+        throw new Error('此問卷紀錄不屬於目前個案，已停止載入以避免覆蓋資料');
+      }
+      if (responseData && String(responseData.template_id) !== String(templateId)) {
+        throw new Error('此問卷紀錄不屬於目前問卷，已停止載入以避免覆蓋資料');
+      }
+
       setPatient(patientData);
       setQuestionnaire(questionnaireData);
       setResponse(responseData);
+
       const remoteAnswers = buildInitialAnswers(questionnaireData, patientData, responseData);
       const localDraft = readLocalDraft(draftStorageKey);
       const shouldRestoreLocal = (
@@ -521,8 +576,11 @@ const QuestionnaireFill = () => {
         onAnswerChange={handleAnswerChange}
       />
 
-      <JsonSummary title="評分結果" data={response?.score_json} />
-      <JsonSummary title="評估結果" data={response?.assessment_result_json} />
+      <ScoreSummary
+        questionnaire={questionnaire}
+        scoreJson={response?.score_json}
+        assessmentResultJson={response?.assessment_result_json}
+      />
 
       <div className="sticky bottom-4 z-20 rounded-2xl border border-sky-100 bg-white/95 p-4 shadow-xl backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

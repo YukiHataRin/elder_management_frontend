@@ -157,6 +157,28 @@ const formatQuestionnaireAnswer = (value, fieldMeta) => {
     return String(optionLabel ?? value);
 };
 
+const formatQuestionnaireScoreValue = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue)) {
+        return numberValue.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+    }
+    return String(value);
+};
+
+const getQuestionnaireScoreSummary = (response) => {
+    const totalScore = formatQuestionnaireScoreValue(response?.score_json?.total_score);
+    const interpretation = response?.score_json?.interpretation
+        || response?.assessment_result_json?.summary
+        || response?.assessment_result_json?.interpretation;
+    const parts = [];
+
+    if (totalScore !== null) parts.push(`總分：${totalScore} 分`);
+    if (interpretation) parts.push(`判讀：${interpretation}`);
+
+    return parts.join(' / ');
+};
+
 
 const PatientDetail = () => {
     const { id } = useParams();
@@ -313,13 +335,13 @@ const PatientDetail = () => {
         }
     }, [id]);
 
-    const fetchQuestionnaireData = useCallback(async (nationId) => {
+    const fetchQuestionnaireData = useCallback(async () => {
         await Promise.resolve();
         setIsQuestionnairesLoading(true);
         try {
             const [templates, responses] = await Promise.all([
                 formsApi.listQuestionnaires(),
-                nationId ? formsApi.listSubjectResponses(nationId) : Promise.resolve([])
+                formsApi.listSubjectResponsesByBackendUser(id)
             ]);
 
             setQuestionnaireTemplates(Array.isArray(templates) ? templates : []);
@@ -338,7 +360,7 @@ const PatientDetail = () => {
         } finally {
             setIsQuestionnairesLoading(false);
         }
-    }, [showToast]);
+    }, [id, showToast]);
 
     const handleChangeActiveTab = (tab) => {
         setActiveTab(tab);
@@ -563,7 +585,7 @@ const PatientDetail = () => {
 
     useEffect(() => {
         if (patient) {
-            fetchQuestionnaireData(patient.details?.nation_id);
+            fetchQuestionnaireData();
         }
     }, [fetchQuestionnaireData, patient]);
 
@@ -1792,9 +1814,9 @@ const PatientDetail = () => {
                                                         {(response.score_json || response.assessment_result_json) && (
                                                             <div className="mt-4 rounded-xl border border-green-100 bg-green-50/60 p-3 text-xs text-green-800">
                                                                 <p className="font-bold">評分/評估結果</p>
-                                                                <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-text/65">
-                                                                    {JSON.stringify(response.assessment_result_json || response.score_json, null, 2)}
-                                                                </pre>
+                                                                <p className="mt-2 rounded-lg bg-white p-2 font-bold text-text/75">
+                                                                    {getQuestionnaireScoreSummary(response) || '已有評分資料'}
+                                                                </p>
                                                             </div>
                                                         )}
                                                     </div>

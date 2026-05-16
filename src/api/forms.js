@@ -74,6 +74,10 @@ export const formsApi = {
 
   listSubjectResponses: (nationId) => formsFetch(`/subjects/${encodeURIComponent(nationId)}/responses`),
 
+  listSubjectResponsesByBackendUser: (subjectBackendUserId) => (
+    formsFetch(`/subjects/by-backend-user/${encodeURIComponent(subjectBackendUserId)}/responses`)
+  ),
+
   compareSubjectResponses: (nationId, responseIds) => {
     const query = responseIds.map(responseId => `response_ids=${encodeURIComponent(responseId)}`).join('&');
     return formsFetch(`/subjects/${encodeURIComponent(nationId)}/responses/compare?${query}`);

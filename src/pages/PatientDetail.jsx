@@ -498,7 +498,7 @@ const PatientDetail = () => {
                         hasAnyValue,
                     };
                 })
-                .filter(row => row.hasAnyValue);
+                .filter(row => row.hasAnyValue && row.isDifferent);
 
             setQuestionnaireComparison({
                 baseResponseId: baseResponse.id,
@@ -1739,12 +1739,12 @@ const PatientDetail = () => {
 
                                                     {questionnaireComparison.rows.length === 0 ? (
                                                         <div className="rounded-xl border border-dashed border-sky-100 bg-sky-50/40 p-4 text-sm font-bold text-text/50">
-                                                            目前沒有可比對的填答內容。
+                                                            目前沒有不一致的填答內容。
                                                         </div>
                                                     ) : (
                                                         <div className="space-y-3">
                                                             {questionnaireComparison.rows.map(row => (
-                                                                <div key={row.field_id} className={`rounded-xl border p-3 ${row.isDifferent ? 'border-amber-100 bg-amber-50/60' : 'border-slate-100 bg-slate-50/50'}`}>
+                                                                <div key={row.field_id} className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
                                                                     <div className="mb-2 flex flex-wrap items-center gap-2">
                                                                         {row.section && <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-primary">{row.section}</span>}
                                                                         {row.isDifferent && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">不一致</span>}

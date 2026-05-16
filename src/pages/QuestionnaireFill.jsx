@@ -13,11 +13,14 @@ const getTodayString = () => new Date().toISOString().slice(0, 10);
 const isEmptyValue = (value) => value === undefined || value === null || value === '';
 
 const AUTOSAVE_DELAY_MS = 1200;
+const LOCAL_DRAFT_PREFIX = 'questionnaire-draft:';
+const LOCAL_DRAFT_MAX_AGE_DAYS = 7;
+const LOCAL_DRAFT_MAX_AGE_MS = LOCAL_DRAFT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
 const getDraftStorageKey = ({ responseId, patientId, templateId, userId }) => (
   responseId
-    ? `questionnaire-draft:response:${responseId}`
-    : `questionnaire-draft:new:${patientId}:${templateId}:${userId || 'unknown'}`
+    ? `${LOCAL_DRAFT_PREFIX}response:${responseId}`
+    : `${LOCAL_DRAFT_PREFIX}new:${patientId}:${templateId}:${userId || 'unknown'}`
 );
 
 const readLocalDraft = (key) => {
@@ -44,6 +47,27 @@ const removeLocalDraft = (key) => {
   } catch (error) {
     console.warn('Failed to remove local questionnaire draft', error);
   }
+};
+
+const cleanupExpiredLocalDrafts = () => {
+  const now = Date.now();
+
+  Object.keys(localStorage).forEach(key => {
+    if (!key.startsWith(LOCAL_DRAFT_PREFIX)) return;
+
+    try {
+      const draft = JSON.parse(localStorage.getItem(key));
+      const savedAt = new Date(draft?.saved_at).getTime();
+      const isExpired = !savedAt || now - savedAt > LOCAL_DRAFT_MAX_AGE_MS;
+
+      if (isExpired) {
+        localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.warn('Removed invalid local questionnaire draft', error);
+      localStorage.removeItem(key);
+    }
+  });
 };
 
 const getRemoteUpdatedAt = (response) => {
@@ -186,6 +210,7 @@ const QuestionnaireFill = () => {
   const loadQuestionnaire = useCallback(async () => {
     setLoading(true);
     hasLoadedRef.current = false;
+    cleanupExpiredLocalDrafts();
     try {
       const [patientData, questionnaireData, responseData] = await Promise.all([
         managementApi.getPatientDetail(id),

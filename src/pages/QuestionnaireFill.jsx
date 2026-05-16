@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, FileText, Loader2, Save, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Cloud, CloudOff, FileText, Loader2, Save, Send } from 'lucide-react';
 import QuestionnaireFormRenderer from '../components/QuestionnaireFormRenderer';
 import { getQuestionnaireFields } from '../utils/questionnaire';
 import { formsApi } from '../api/forms';
@@ -11,6 +11,45 @@ import { useAuth } from '../context/useAuth';
 const getTodayString = () => new Date().toISOString().slice(0, 10);
 
 const isEmptyValue = (value) => value === undefined || value === null || value === '';
+
+const AUTOSAVE_DELAY_MS = 1200;
+
+const getDraftStorageKey = ({ responseId, patientId, templateId, userId }) => (
+  responseId
+    ? `questionnaire-draft:response:${responseId}`
+    : `questionnaire-draft:new:${patientId}:${templateId}:${userId || 'unknown'}`
+);
+
+const readLocalDraft = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn('Failed to read local questionnaire draft', error);
+    return null;
+  }
+};
+
+const writeLocalDraft = (key, data) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.warn('Failed to write local questionnaire draft', error);
+  }
+};
+
+const removeLocalDraft = (key) => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.warn('Failed to remove local questionnaire draft', error);
+  }
+};
+
+const getRemoteUpdatedAt = (response) => {
+  if (!response?.updated_at && !response?.created_at) return 0;
+  return new Date(response.updated_at || response.created_at).getTime();
+};
 
 const buildInitialAnswers = (questionnaire, patient, response) => {
   const existingAnswers = response?.answers_json || {};
@@ -59,6 +98,51 @@ const JsonSummary = ({ title, data }) => {
   );
 };
 
+const getAutosaveMeta = (status, isOnline, lastAutosavedAt) => {
+  const timeText = lastAutosavedAt ? formatDateTime(lastAutosavedAt) : null;
+
+  if (!isOnline || status === 'offline') {
+    return {
+      icon: <CloudOff size={17} />,
+      className: 'border-amber-100 bg-amber-50 text-amber-700',
+      text: timeText ? `離線暫存於本機：${timeText}` : '目前離線，填答會先暫存在本機',
+    };
+  }
+  if (status === 'pending') {
+    return {
+      icon: <Loader2 size={17} className="animate-spin" />,
+      className: 'border-sky-100 bg-sky-50 text-primary',
+      text: '正在自動儲存草稿...',
+    };
+  }
+  if (status === 'error') {
+    return {
+      icon: <CloudOff size={17} />,
+      className: 'border-rose-100 bg-rose-50 text-rose-700',
+      text: timeText ? `後端暫存失敗，本機已暫存：${timeText}` : '後端暫存失敗，本機仍保留填答',
+    };
+  }
+  if (status === 'local_restored') {
+    return {
+      icon: <Cloud size={17} />,
+      className: 'border-amber-100 bg-amber-50 text-amber-700',
+      text: timeText ? `已還原本機暫存：${timeText}` : '已還原本機暫存',
+    };
+  }
+  if (status === 'local_only') {
+    return {
+      icon: <CloudOff size={17} />,
+      className: 'border-amber-100 bg-amber-50 text-amber-700',
+      text: timeText ? `本機已暫存：${timeText}` : '本機已暫存',
+    };
+  }
+  return {
+    icon: <Cloud size={17} />,
+    className: 'border-green-100 bg-green-50 text-green-700',
+    text: timeText ? `已自動儲存：${timeText}` : '已啟用自動儲存',
+  };
+};
+
 const QuestionnaireFill = () => {
   const { id, templateId } = useParams();
   const [searchParams] = useSearchParams();
@@ -74,20 +158,34 @@ const QuestionnaireFill = () => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState('idle');
+  const [lastAutosavedAt, setLastAutosavedAt] = useState(null);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const hasLoadedRef = useRef(false);
+  const skipNextAutosaveRef = useRef(false);
+  const latestAnswersRef = useRef({});
 
   const isSubmitted = response?.status === 'submitted';
   const canEditResponse = !response || isAdmin || response.filled_by_user_id === user?.id;
   const isReadOnly = isSubmitted || !canEditResponse;
   const subjectNationId = patient?.details?.nation_id?.trim();
+  const draftStorageKey = useMemo(() => getDraftStorageKey({
+    responseId,
+    patientId: id,
+    templateId,
+    userId: user?.id,
+  }), [id, responseId, templateId, user?.id]);
 
   const responseMeta = useMemo(() => ([
     { label: '狀態', value: isSubmitted ? '已送出' : '草稿' },
     { label: '建立時間', value: formatDateTime(response?.created_at) },
     { label: '更新時間', value: formatDateTime(response?.updated_at) },
   ]), [isSubmitted, response]);
+  const autosaveMeta = getAutosaveMeta(autosaveStatus, isOnline, lastAutosavedAt);
 
   const loadQuestionnaire = useCallback(async () => {
     setLoading(true);
+    hasLoadedRef.current = false;
     try {
       const [patientData, questionnaireData, responseData] = await Promise.all([
         managementApi.getPatientDetail(id),
@@ -98,14 +196,33 @@ const QuestionnaireFill = () => {
       setPatient(patientData);
       setQuestionnaire(questionnaireData);
       setResponse(responseData);
-      setAnswers(buildInitialAnswers(questionnaireData, patientData, responseData));
+      const remoteAnswers = buildInitialAnswers(questionnaireData, patientData, responseData);
+      const localDraft = readLocalDraft(draftStorageKey);
+      const shouldRestoreLocal = (
+        localDraft?.answers_json
+        && localDraft.saved_at
+        && new Date(localDraft.saved_at).getTime() > getRemoteUpdatedAt(responseData)
+      );
+      const initialAnswers = shouldRestoreLocal ? localDraft.answers_json : remoteAnswers;
+
+      skipNextAutosaveRef.current = true;
+      latestAnswersRef.current = initialAnswers;
+      setAnswers(initialAnswers);
+      if (shouldRestoreLocal) {
+        setAutosaveStatus('local_restored');
+        setLastAutosavedAt(localDraft.saved_at);
+      } else {
+        setAutosaveStatus('idle');
+        setLastAutosavedAt(responseData?.updated_at || null);
+      }
     } catch (error) {
       console.error('Failed to load questionnaire:', error);
       showToast('載入問卷失敗: ' + error.message, 'error');
     } finally {
+      hasLoadedRef.current = true;
       setLoading(false);
     }
-  }, [id, responseId, showToast, templateId]);
+  }, [draftStorageKey, id, responseId, showToast, templateId]);
 
   useEffect(() => {
     loadQuestionnaire();
@@ -118,11 +235,114 @@ const QuestionnaireFill = () => {
     }));
   };
 
-  const buildPayload = () => ({
+  const buildPayload = useCallback((nextAnswers = answers) => ({
     subject_nation_id: subjectNationId,
     subject_backend_user_id: Number(id),
-    answers_json: answers,
-  });
+    answers_json: nextAnswers,
+  }), [answers, id, subjectNationId]);
+
+  useEffect(() => {
+    latestAnswersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedRef.current || loading || isReadOnly) return undefined;
+
+    const savedAt = new Date().toISOString();
+    writeLocalDraft(draftStorageKey, {
+      response_id: responseId || response?.id || null,
+      template_id: Number(templateId),
+      patient_id: Number(id),
+      subject_nation_id: subjectNationId,
+      answers_json: answers,
+      saved_at: savedAt,
+    });
+    setLastAutosavedAt(savedAt);
+
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false;
+      return undefined;
+    }
+
+    if (!subjectNationId) {
+      setAutosaveStatus('local_only');
+      return undefined;
+    }
+
+    if (!isOnline) {
+      setAutosaveStatus('offline');
+      return undefined;
+    }
+
+    setAutosaveStatus('pending');
+    const timer = window.setTimeout(async () => {
+      try {
+        const payload = buildPayload(latestAnswersRef.current);
+        const savedResponse = responseId
+          ? await formsApi.updateDraft(responseId, payload)
+          : await formsApi.saveDraft(templateId, payload);
+        setResponse(savedResponse);
+        setAutosaveStatus('saved');
+        setLastAutosavedAt(new Date().toISOString());
+        if (!responseId && savedResponse.id) {
+          const nextKey = getDraftStorageKey({
+            responseId: savedResponse.id,
+            patientId: id,
+            templateId,
+            userId: user?.id,
+          });
+          writeLocalDraft(nextKey, {
+            response_id: savedResponse.id,
+            template_id: Number(templateId),
+            patient_id: Number(id),
+            subject_nation_id: subjectNationId,
+            answers_json: latestAnswersRef.current,
+            saved_at: new Date().toISOString(),
+          });
+          removeLocalDraft(draftStorageKey);
+          navigate(`/patients/${id}/questionnaires/${templateId}/fill?responseId=${savedResponse.id}`, { replace: true });
+        }
+      } catch (error) {
+        console.error('Failed to autosave questionnaire draft:', error);
+        setAutosaveStatus(navigator.onLine ? 'error' : 'offline');
+      }
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    answers,
+    buildPayload,
+    draftStorageKey,
+    id,
+    isOnline,
+    isReadOnly,
+    loading,
+    navigate,
+    response?.id,
+    responseId,
+    subjectNationId,
+    templateId,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (isOnline && autosaveStatus === 'offline') {
+      setAutosaveStatus('pending');
+      setAnswers(prev => ({ ...prev }));
+    }
+  }, [autosaveStatus, isOnline]);
 
   const validateBeforeSave = () => {
     if (!subjectNationId) {
@@ -152,6 +372,7 @@ const QuestionnaireFill = () => {
         : await formsApi.saveDraft(templateId, buildPayload());
       setResponse(savedResponse);
       setAnswers(savedResponse.answers_json || answers);
+      removeLocalDraft(draftStorageKey);
       showToast('草稿已儲存', 'success');
       if (!responseId && savedResponse.id) {
         navigate(`/patients/${id}/questionnaires/${templateId}/fill?responseId=${savedResponse.id}`, { replace: true });
@@ -177,6 +398,7 @@ const QuestionnaireFill = () => {
         : await formsApi.submitResponse(templateId, buildPayload());
       setResponse(submittedResponse);
       setAnswers(submittedResponse.answers_json || answers);
+      removeLocalDraft(draftStorageKey);
       showToast('問卷已送出', 'success');
       navigate(`/patients/${id}?tab=health`);
     } catch (error) {
@@ -260,6 +482,13 @@ const QuestionnaireFill = () => {
         </div>
       )}
 
+      {!isReadOnly && (
+        <div className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-bold ${autosaveMeta.className}`}>
+          {autosaveMeta.icon}
+          <span>{autosaveMeta.text}</span>
+        </div>
+      )}
+
       <QuestionnaireFormRenderer
         questionnaire={questionnaire}
         answers={answers}
@@ -273,7 +502,7 @@ const QuestionnaireFill = () => {
       <div className="sticky bottom-4 z-20 rounded-2xl border border-sky-100 bg-white/95 p-4 shadow-xl backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-sm font-bold text-text/50">
-            <FileText size={17} />
+            {isReadOnly ? <FileText size={17} /> : autosaveMeta.icon}
             {isSubmitted ? '此問卷已送出，內容僅供檢視' : canEditResponse ? '可先儲存草稿，確認後再正式送出' : '此草稿由其他個管師派發，內容僅供檢視'}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">

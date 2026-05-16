@@ -133,7 +133,7 @@ const PatientDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { isAdmin } = useAuth();
+    const { isAdmin, user } = useAuth();
     const { showToast, requestConfirm } = useToast();
     const [activeTab, setActiveTab] = useState(() => {
         const tab = searchParams.get('tab');
@@ -190,6 +190,9 @@ const PatientDetail = () => {
     const [questionnaireCategoryFilter, setQuestionnaireCategoryFilter] = useState('all');
     const [selectedQuestionnaireIds, setSelectedQuestionnaireIds] = useState([]);
     const [isDispatchingQuestionnaires, setIsDispatchingQuestionnaires] = useState(false);
+    const [selectedCompareResponseIds, setSelectedCompareResponseIds] = useState([]);
+    const [comparisonResult, setComparisonResult] = useState(null);
+    const [isComparingResponses, setIsComparingResponses] = useState(false);
 
     const [isEditPatientModalOpen, setIsEditPatientModalOpen] = useState(false);
     const [isSavingPatient, setIsSavingPatient] = useState(false);
@@ -297,6 +300,9 @@ const PatientDetail = () => {
                     ? [...responses].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
                     : []
             );
+            setSelectedCompareResponseIds(prev => prev.filter(responseId => (
+                Array.isArray(responses) && responses.some(response => response.id === responseId)
+            )));
         } catch (error) {
             console.error('Failed to fetch questionnaire data:', error);
             showToast('載入問卷資料失敗: ' + error.message, 'error');
@@ -316,8 +322,8 @@ const PatientDetail = () => {
 
     const getQuestionnaireSubjectId = () => patient?.details?.nation_id?.trim();
 
-    const getDraftForTemplate = (templateId) => questionnaireResponses.find(response => (
-        String(response.template_id) === String(templateId) && response.status === 'draft'
+    const getResponsesForTemplate = (templateId) => questionnaireResponses.filter(response => (
+        String(response.template_id) === String(templateId)
     ));
 
     const handleOpenQuestionnaireModal = () => {
@@ -350,12 +356,7 @@ const PatientDetail = () => {
         setIsDispatchingQuestionnaires(true);
         try {
             const today = new Date().toISOString().slice(0, 10);
-            const existingDrafts = selectedQuestionnaireIds
-                .map(templateId => getDraftForTemplate(templateId))
-                .filter(Boolean);
-            const idsToCreate = selectedQuestionnaireIds.filter(templateId => !getDraftForTemplate(templateId));
-
-            const createdResponses = await Promise.all(idsToCreate.map(templateId => formsApi.saveDraft(templateId, {
+            const createdResponses = await Promise.all(selectedQuestionnaireIds.map(templateId => formsApi.createDraft(templateId, {
                 subject_nation_id: nationId,
                 subject_backend_user_id: parseInt(id),
                 answers_json: {
@@ -370,22 +371,51 @@ const PatientDetail = () => {
             setActiveTab('health');
             setSearchParams({ tab: 'health' });
 
-            if (createdResponses.length > 0 && existingDrafts.length > 0) {
-                showToast(`已派發 ${createdResponses.length} 份問卷，另有 ${existingDrafts.length} 份已有草稿`, 'success');
-            } else if (createdResponses.length > 0) {
-                showToast(`已派發 ${createdResponses.length} 份問卷`, 'success');
-            } else if (existingDrafts.length === 1) {
-                showToast('此問卷已經有草稿，已開啟填寫頁', 'info');
-                const draft = existingDrafts[0];
-                navigate(`/patients/${id}/questionnaires/${draft.template_id}/fill?responseId=${draft.id}`);
-            } else {
-                showToast('選取的問卷皆已有草稿', 'info');
-            }
+            showToast(`已派發 ${createdResponses.length} 份問卷`, 'success');
         } catch (error) {
             console.error('Failed to dispatch questionnaires:', error);
             showToast('派發問卷失敗: ' + error.message, 'error');
         } finally {
             setIsDispatchingQuestionnaires(false);
+        }
+    };
+
+    const toggleCompareResponse = (responseId) => {
+        setSelectedCompareResponseIds(prev => (
+            prev.includes(responseId)
+                ? prev.filter(id => id !== responseId)
+                : [...prev, responseId]
+        ));
+        setComparisonResult(null);
+    };
+
+    const handleCompareQuestionnaires = async () => {
+        const nationId = getQuestionnaireSubjectId();
+        if (!nationId) return showToast('請先補上個案身分/代碼', 'error');
+        if (selectedCompareResponseIds.length < 2) return showToast('請至少選擇兩份問卷紀錄', 'error');
+
+        const selectedResponses = questionnaireResponses.filter(response => selectedCompareResponseIds.includes(response.id));
+        const templateIds = new Set(selectedResponses.map(response => response.template_id));
+        if (templateIds.size > 1) {
+            return showToast('目前只能比對同一份問卷模板的紀錄', 'error');
+        }
+
+        setIsComparingResponses(true);
+        try {
+            const result = await formsApi.compareSubjectResponses(nationId, selectedCompareResponseIds);
+            setComparisonResult(result);
+            if (!result.can_compare) {
+                showToast(result.reason || '無法比對選取的問卷', 'error');
+            } else if ((result.differences || []).length === 0) {
+                showToast('選取問卷沒有發現不一致欄位', 'success');
+            } else {
+                showToast(`找到 ${result.differences.length} 個不一致欄位`, 'info');
+            }
+        } catch (error) {
+            console.error('Failed to compare questionnaire responses:', error);
+            showToast('比對問卷失敗: ' + error.message, 'error');
+        } finally {
+            setIsComparingResponses(false);
         }
     };
 
@@ -1557,6 +1587,80 @@ const PatientDetail = () => {
                                         </div>
                                     )}
 
+                                    {questionnaireResponses.length > 0 && (
+                                        <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div>
+                                                    <p className="text-sm font-bold text-text">問卷交叉比對</p>
+                                                    <p className="mt-1 text-xs text-text/45">
+                                                        勾選同一份問卷的兩筆以上紀錄，比對每個欄位是否不一致
+                                                    </p>
+                                                </div>
+                                                <div className="flex flex-col gap-2 sm:flex-row">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedCompareResponseIds([]);
+                                                            setComparisonResult(null);
+                                                        }}
+                                                        disabled={selectedCompareResponseIds.length === 0 || isComparingResponses}
+                                                        className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-text/60 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        清除選取
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleCompareQuestionnaires}
+                                                        disabled={selectedCompareResponseIds.length < 2 || isComparingResponses}
+                                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-light disabled:cursor-not-allowed disabled:bg-slate-300"
+                                                    >
+                                                        {isComparingResponses ? <Loader2 size={16} className="animate-spin" /> : <SlidersHorizontal size={16} />}
+                                                        比對 {selectedCompareResponseIds.length} 筆
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {comparisonResult && (
+                                                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                                    {!comparisonResult.can_compare ? (
+                                                        <p className="text-sm font-bold text-rose-600">{comparisonResult.reason || '無法比對選取的問卷'}</p>
+                                                    ) : (comparisonResult.differences || []).length === 0 ? (
+                                                        <p className="text-sm font-bold text-green-700">沒有發現不一致欄位。</p>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            <div>
+                                                                <p className="text-sm font-bold text-text">
+                                                                    {comparisonResult.template_title}：{comparisonResult.differences.length} 個不一致欄位
+                                                                </p>
+                                                                <p className="mt-1 text-xs text-text/45">比對紀錄：{selectedCompareResponseIds.join('、')}</p>
+                                                            </div>
+                                                            <div className="space-y-3">
+                                                                {comparisonResult.differences.map(diff => (
+                                                                    <div key={diff.field_id} className="rounded-xl border border-white bg-white p-3">
+                                                                        <div className="mb-2">
+                                                                            {diff.section && <p className="text-[11px] font-bold text-primary">{diff.section}</p>}
+                                                                            <p className="text-sm font-bold text-text">{diff.label}</p>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                                            {(diff.values || []).map(value => (
+                                                                                <div key={`${diff.field_id}-${value.response_id}`} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                                                                                    <p className="text-[11px] font-bold text-text/40">
+                                                                                        回覆 #{value.response_id} / 個管師 ID {value.filled_by_user_id}
+                                                                                    </p>
+                                                                                    <p className="mt-1 text-sm font-bold text-text">{value.display_value}</p>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {isQuestionnairesLoading ? (
                                         <div className="flex flex-col items-center justify-center py-10 text-primary">
                                             <Loader2 size={32} className="animate-spin mb-3" />
@@ -1572,11 +1676,21 @@ const PatientDetail = () => {
                                             {questionnaireResponses.map(response => {
                                                 const template = getQuestionnaireTemplate(response.template_id);
                                                 const statusMeta = getQuestionnaireStatusMeta(response.status);
+                                                const canEditResponse = isAdmin || response.filled_by_user_id === user?.id;
                                                 return (
                                                     <div key={response.id} className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
                                                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="mb-2 flex flex-wrap items-center gap-2">
+                                                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-sky-100 bg-white px-2.5 py-1 text-xs font-bold text-text/55">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="h-3.5 w-3.5 rounded text-primary focus:ring-primary/20"
+                                                                            checked={selectedCompareResponseIds.includes(response.id)}
+                                                                            onChange={() => toggleCompareResponse(response.id)}
+                                                                        />
+                                                                        比對
+                                                                    </label>
                                                                     <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${statusMeta.className}`}>
                                                                         {statusMeta.label}
                                                                     </span>
@@ -1592,6 +1706,7 @@ const PatientDetail = () => {
                                                                     <p>更新：{formatLogDate(response.updated_at || response.created_at)}</p>
                                                                     <p>問卷 ID：{response.template_id}</p>
                                                                     <p>回覆 ID：{response.id}</p>
+                                                                    <p>個管師 ID：{response.filled_by_user_id}</p>
                                                                 </div>
                                                             </div>
                                                             <div className="flex flex-col gap-2 sm:w-32">
@@ -1601,9 +1716,9 @@ const PatientDetail = () => {
                                                                     className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-light"
                                                                 >
                                                                     {response.status === 'submitted' ? <Eye size={16} /> : <Edit3 size={16} />}
-                                                                    {response.status === 'submitted' ? '檢視' : '填寫'}
+                                                                    {response.status === 'submitted' || !canEditResponse ? '檢視' : '填寫'}
                                                                 </button>
-                                                                {response.status === 'draft' && (
+                                                                {response.status === 'draft' && canEditResponse && (
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleDeleteQuestionnaireDraft(response.id)}
@@ -1712,7 +1827,8 @@ const PatientDetail = () => {
                             ) : (
                                 <div className="grid grid-cols-1 gap-3">
                                     {filteredQuestionnaireTemplates.map(template => {
-                                        const existingDraft = getDraftForTemplate(template.id);
+                                        const existingResponses = getResponsesForTemplate(template.id);
+                                        const latestDraft = existingResponses.find(response => response.status === 'draft');
                                         const checked = selectedQuestionnaireIds.includes(template.id);
                                         return (
                                             <div
@@ -1724,15 +1840,13 @@ const PatientDetail = () => {
                                                 }`}
                                             >
                                                 <div className="flex items-start gap-3">
-                                                    {!existingDraft && (
-                                                        <input
-                                                            type="checkbox"
-                                                            className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary/20"
-                                                            checked={checked}
-                                                            disabled={isDispatchingQuestionnaires}
-                                                            onChange={() => toggleSelectedQuestionnaire(template.id)}
-                                                        />
-                                                    )}
+                                                    <input
+                                                        type="checkbox"
+                                                        className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary/20"
+                                                        checked={checked}
+                                                        disabled={isDispatchingQuestionnaires}
+                                                        onChange={() => toggleSelectedQuestionnaire(template.id)}
+                                                    />
                                                     <div className="min-w-0 flex-1">
                                                         <div className="mb-2 flex flex-wrap gap-2">
                                                             <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-primary">
@@ -1748,9 +1862,9 @@ const PatientDetail = () => {
                                                                     含評分
                                                                 </span>
                                                             )}
-                                                            {existingDraft && (
+                                                            {existingResponses.length > 0 && (
                                                                 <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                                                                    已有草稿
+                                                                    已有 {existingResponses.length} 筆
                                                                 </span>
                                                             )}
                                                         </div>
@@ -1759,13 +1873,13 @@ const PatientDetail = () => {
                                                             {template.source_file_type?.toUpperCase()} / {template.extraction_status} / ID {template.id}
                                                         </p>
                                                     </div>
-                                                    {existingDraft && (
+                                                    {latestDraft && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => navigate(`/patients/${id}/questionnaires/${template.id}/fill?responseId=${existingDraft.id}`)}
+                                                            onClick={() => navigate(`/patients/${id}/questionnaires/${template.id}/fill?responseId=${latestDraft.id}`)}
                                                             className="shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-light"
                                                         >
-                                                            填寫草稿
+                                                            最新草稿
                                                         </button>
                                                     )}
                                                 </div>

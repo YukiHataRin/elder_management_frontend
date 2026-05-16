@@ -47,7 +47,22 @@ export const formsApi = {
     body: JSON.stringify(data),
   }),
 
+  createDraft: (templateId, data) => formsFetch(`/questionnaires/${templateId}/drafts`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  updateDraft: (responseId, data) => formsFetch(`/responses/${responseId}/draft`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
   submitResponse: (templateId, data) => formsFetch(`/questionnaires/${templateId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  submitExistingResponse: (responseId, data) => formsFetch(`/responses/${responseId}/submit`, {
     method: 'POST',
     body: JSON.stringify(data),
   }),
@@ -58,6 +73,11 @@ export const formsApi = {
   },
 
   listSubjectResponses: (nationId) => formsFetch(`/subjects/${encodeURIComponent(nationId)}/responses`),
+
+  compareSubjectResponses: (nationId, responseIds) => {
+    const query = responseIds.map(responseId => `response_ids=${encodeURIComponent(responseId)}`).join('&');
+    return formsFetch(`/subjects/${encodeURIComponent(nationId)}/responses/compare?${query}`);
+  },
 
   getResponse: (responseId) => formsFetch(`/responses/${responseId}`),
 

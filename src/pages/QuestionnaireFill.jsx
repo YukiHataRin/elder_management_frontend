@@ -6,6 +6,7 @@ import { getQuestionnaireFields } from '../utils/questionnaire';
 import { formsApi } from '../api/forms';
 import { managementApi } from '../api/management';
 import { useToast } from '../context/useToast';
+import { useAuth } from '../context/useAuth';
 
 const getTodayString = () => new Date().toISOString().slice(0, 10);
 
@@ -63,6 +64,7 @@ const QuestionnaireFill = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast, requestConfirm } = useToast();
+  const { isAdmin, user } = useAuth();
   const responseId = searchParams.get('responseId');
 
   const [patient, setPatient] = useState(null);
@@ -74,6 +76,8 @@ const QuestionnaireFill = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isSubmitted = response?.status === 'submitted';
+  const canEditResponse = !response || isAdmin || response.filled_by_user_id === user?.id;
+  const isReadOnly = isSubmitted || !canEditResponse;
   const subjectNationId = patient?.details?.nation_id?.trim();
 
   const responseMeta = useMemo(() => ([
@@ -139,11 +143,13 @@ const QuestionnaireFill = () => {
   };
 
   const handleSaveDraft = async () => {
-    if (!validateBeforeSave() || isSubmitted) return;
+    if (!validateBeforeSave() || isReadOnly) return;
 
     setIsSaving(true);
     try {
-      const savedResponse = await formsApi.saveDraft(templateId, buildPayload());
+      const savedResponse = responseId
+        ? await formsApi.updateDraft(responseId, buildPayload())
+        : await formsApi.saveDraft(templateId, buildPayload());
       setResponse(savedResponse);
       setAnswers(savedResponse.answers_json || answers);
       showToast('草稿已儲存', 'success');
@@ -159,14 +165,16 @@ const QuestionnaireFill = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validateBeforeSave() || isSubmitted) return;
+    if (!validateBeforeSave() || isReadOnly) return;
 
     const confirmed = await requestConfirm('送出後會成為正式問卷回覆，確定要送出嗎？', '確認送出問卷');
     if (!confirmed) return;
 
     setIsSubmitting(true);
     try {
-      const submittedResponse = await formsApi.submitResponse(templateId, buildPayload());
+      const submittedResponse = responseId
+        ? await formsApi.submitExistingResponse(responseId, buildPayload())
+        : await formsApi.submitResponse(templateId, buildPayload());
       setResponse(submittedResponse);
       setAnswers(submittedResponse.answers_json || answers);
       showToast('問卷已送出', 'success');
@@ -255,7 +263,7 @@ const QuestionnaireFill = () => {
       <QuestionnaireFormRenderer
         questionnaire={questionnaire}
         answers={answers}
-        disabled={isSubmitted}
+        disabled={isReadOnly}
         onAnswerChange={handleAnswerChange}
       />
 
@@ -266,13 +274,13 @@ const QuestionnaireFill = () => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 text-sm font-bold text-text/50">
             <FileText size={17} />
-            {isSubmitted ? '此問卷已送出，內容僅供檢視' : '可先儲存草稿，確認後再正式送出'}
+            {isSubmitted ? '此問卷已送出，內容僅供檢視' : canEditResponse ? '可先儲存草稿，確認後再正式送出' : '此草稿由其他個管師派發，內容僅供檢視'}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
               onClick={handleSaveDraft}
-              disabled={isSaving || isSubmitting || isSubmitted || !subjectNationId}
+              disabled={isSaving || isSubmitting || isReadOnly || !subjectNationId}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-5 py-2.5 text-sm font-bold text-primary transition-colors hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
@@ -281,7 +289,7 @@ const QuestionnaireFill = () => {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isSaving || isSubmitting || isSubmitted || !subjectNationId}
+              disabled={isSaving || isSubmitting || isReadOnly || !subjectNationId}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-primary/20 transition-colors hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}

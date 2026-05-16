@@ -124,7 +124,6 @@ const ScoreSummary = ({ questionnaire, scoreJson, assessmentResultJson }) => {
   const fields = getQuestionnaireFields(questionnaire);
   const fieldLabels = Object.fromEntries(fields.map(field => [field.id, field.label || field.id]));
   const totalScore = formatScoreValue(scoreJson?.total_score);
-  const interpretation = scoreJson?.interpretation || assessmentResultJson?.summary || assessmentResultJson?.interpretation;
   const fieldScores = Array.isArray(scoreJson?.fields) ? scoreJson.fields : [];
 
   return (
@@ -138,12 +137,6 @@ const ScoreSummary = ({ questionnaire, scoreJson, assessmentResultJson }) => {
           <div className="rounded-xl bg-white p-3">
             <p className="text-xs font-bold text-text/45">總分</p>
             <p className="mt-1 text-2xl font-bold text-green-800">{totalScore} 分</p>
-          </div>
-        )}
-        {interpretation && (
-          <div className="rounded-xl bg-white p-3">
-            <p className="text-xs font-bold text-text/45">判讀</p>
-            <p className="mt-1 text-lg font-bold text-green-800">{interpretation}</p>
           </div>
         )}
       </div>

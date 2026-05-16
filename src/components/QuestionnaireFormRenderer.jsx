@@ -297,15 +297,6 @@ const ScorePreview = ({ scoringJson }) => {
       {scoringJson.total_score?.max !== undefined && (
         <p className="mb-2">總分上限：{scoringJson.total_score.max}</p>
       )}
-      {Array.isArray(scoringJson.interpretation) && scoringJson.interpretation.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {scoringJson.interpretation.map((item, index) => (
-            <span key={index} className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-bold text-amber-800">
-              {item.range}：{item.label}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

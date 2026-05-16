@@ -169,13 +169,9 @@ const formatQuestionnaireScoreValue = (value) => {
 
 const getQuestionnaireScoreSummary = (response) => {
     const totalScore = formatQuestionnaireScoreValue(response?.score_json?.total_score);
-    const interpretation = response?.score_json?.interpretation
-        || response?.assessment_result_json?.summary
-        || response?.assessment_result_json?.interpretation;
     const parts = [];
 
     if (totalScore !== null) parts.push(`總分：${totalScore} 分`);
-    if (interpretation) parts.push(`判讀：${interpretation}`);
 
     return parts.join(' / ');
 };
@@ -1851,11 +1847,11 @@ const PatientDetail = () => {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        {(response.score_json || response.assessment_result_json) && (
+                                                        {response.score_json && (
                                                             <div className="mt-4 rounded-xl border border-green-100 bg-green-50/60 p-3 text-xs text-green-800">
-                                                                <p className="font-bold">評分/評估結果</p>
+                                                                <p className="font-bold">評分紀錄</p>
                                                                 <p className="mt-2 rounded-lg bg-white p-2 font-bold text-text/75">
-                                                                    {getQuestionnaireScoreSummary(response) || '已有評分資料'}
+                                                                    {getQuestionnaireScoreSummary(response) || '已有評分紀錄'}
                                                                 </p>
                                                             </div>
                                                         )}

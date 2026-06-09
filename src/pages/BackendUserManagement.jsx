@@ -15,10 +15,11 @@ const BackendUserManagement = () => {
     const [loadingPatients, setLoadingPatients] = useState(false);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const DEFAULT_MANAGER_PASSWORD = '000000';
     const [createFormData, setCreateFormData] = useState({
         username: '',
         display_name: '',
-        password: '',
+        password: DEFAULT_MANAGER_PASSWORD,
         role_id: 2 // Default to Manager
     });
 
@@ -50,7 +51,7 @@ const BackendUserManagement = () => {
                 is_active: true
             });
             setShowCreateModal(false);
-            setCreateFormData({ username: '', display_name: '', password: '', role_id: 2 });
+            setCreateFormData({ username: '', display_name: '', password: DEFAULT_MANAGER_PASSWORD, role_id: 2 });
             fetchUsers();
         } catch (error) {
             alert('建立帳號失敗: ' + error.message);
@@ -223,10 +224,11 @@ const BackendUserManagement = () => {
                                     required
                                     type="text"
                                     className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
-                                    placeholder="例如：manager_01"
+                                    placeholder="建議使用 Email，例如：manager@example.com"
                                     value={createFormData.username}
                                     onChange={(e) => setCreateFormData({...createFormData, username: e.target.value})}
                                 />
+                                <p className="text-[11px] font-bold text-text/40 ml-1">若角色為個管師且帳號為 Email，系統會自動寄送帳號通知信。</p>
                             </div>
 
                             <div className="space-y-1">
@@ -247,10 +249,11 @@ const BackendUserManagement = () => {
                                     required
                                     type="password"
                                     className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                    placeholder="請設定登入密碼"
+                                    placeholder="個管師預設為 000000"
                                     value={createFormData.password}
                                     onChange={(e) => setCreateFormData({...createFormData, password: e.target.value})}
                                 />
+                                <p className="text-[11px] font-bold text-text/40 ml-1">建立個管師帳號時，通知信會帶入此初始密碼。</p>
                             </div>
 
                             <div className="space-y-1">
@@ -258,7 +261,14 @@ const BackendUserManagement = () => {
                                 <select
                                     className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
                                     value={createFormData.role_id}
-                                    onChange={(e) => setCreateFormData({...createFormData, role_id: e.target.value})}
+                                    onChange={(e) => {
+                                        const nextRoleId = e.target.value;
+                                        setCreateFormData({
+                                            ...createFormData,
+                                            role_id: nextRoleId,
+                                            password: nextRoleId === '2' && !createFormData.password ? DEFAULT_MANAGER_PASSWORD : createFormData.password
+                                        });
+                                    }}
                                 >
                                     <option value={2}>個案管理師 (Manager)</option>
                                     <option value={1}>超級管理員 (Admin)</option>

@@ -1,0 +1,655 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { managementApi } from '../api/management';
+import { Shield, UserCheck, UserX, Clock, Search, Filter, Users, X, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/useToast';
+
+const roleNameById = {
+    1: '超級管理員',
+    2: '個管師',
+    5: '待審核',
+};
+
+const getPatientGenderValue = (patient) => {
+    const genderName = String(patient?.details?.gender?.name || '').toLowerCase();
+    const genderId = Number(patient?.details?.gender_id);
+    if (genderName.includes('female') || genderName.includes('女') || genderId === 2) return 'female';
+    if (genderName.includes('male') || genderName.includes('男') || genderId === 1) return 'male';
+    return 'other';
+};
+
+const calculateAge = (birthday) => {
+    if (!birthday) return null;
+    const birthDate = new Date(birthday);
+    if (Number.isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age -= 1;
+    return age >= 0 ? age : null;
+};
+
+const BackendUserManagement = () => {
+    const navigate = useNavigate();
+    const { showToast, requestConfirm } = useToast();
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [filterRole, setFilterRole] = useState('');
+    
+    // Modal states for viewing manager's patients
+    const [selectedManager, setSelectedManager] = useState(null);
+    const [managerPatients, setManagerPatients] = useState([]);
+    const [allPatients, setAllPatients] = useState([]);
+    const [selectedPatientIds, setSelectedPatientIds] = useState([]);
+    const [patientSearch, setPatientSearch] = useState('');
+    const [patientGenderFilter, setPatientGenderFilter] = useState('all');
+    const [patientRoleFilter, setPatientRoleFilter] = useState('all');
+    const [patientAgeMin, setPatientAgeMin] = useState('');
+    const [patientAgeMax, setPatientAgeMax] = useState('');
+    const [loadingPatients, setLoadingPatients] = useState(false);
+    const [isSavingAssignments, setIsSavingAssignments] = useState(false);
+
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const DEFAULT_MANAGER_PASSWORD = '000000';
+    const [createFormData, setCreateFormData] = useState({
+        username: '',
+        display_name: '',
+        password: DEFAULT_MANAGER_PASSWORD,
+        role_id: 2 // Default to Manager
+    });
+
+    const fetchUsers = useCallback(async () => {
+        await Promise.resolve();
+        setLoading(true);
+        try {
+            const data = await managementApi.getBackendUsers(filterRole);
+            setUsers(data);
+        } catch (error) {
+            console.error('Failed to fetch backend users', error);
+        }
+        setLoading(false);
+    }, [filterRole]);
+
+    useEffect(() => {
+        const timerId = window.setTimeout(() => {
+            fetchUsers();
+        }, 0);
+        return () => window.clearTimeout(timerId);
+    }, [fetchUsers]);
+
+    const handleCreateBackendUser = async (e) => {
+        e.preventDefault();
+        try {
+            await managementApi.createUser({
+                ...createFormData,
+                role_id: parseInt(createFormData.role_id),
+                is_active: true
+            });
+            setShowCreateModal(false);
+            setCreateFormData({ username: '', display_name: '', password: DEFAULT_MANAGER_PASSWORD, role_id: 2 });
+            fetchUsers();
+        } catch (error) {
+            alert('建立帳號失敗: ' + error.message);
+        }
+    };
+
+    const handleUpdateRole = async (userId, newRoleId) => {
+        try {
+            await managementApi.updateUserRole(userId, newRoleId);
+            fetchUsers();
+        } catch (error) {
+            alert('更新角色失敗: ' + error.message);
+        }
+    };
+
+    const handleConfirmUpdateRole = async (user, newRoleId) => {
+        const isDemotion = newRoleId === 5;
+        const title = isDemotion ? '移除帳號權限' : '核准帳號';
+        const nextRoleName = roleNameById[newRoleId] || `角色 ${newRoleId}`;
+        const confirmed = await requestConfirm(
+            isDemotion
+                ? `確定要將「${user.display_name}」移回待審核狀態嗎？此帳號將無法使用後端管理功能。`
+                : `確定要核准「${user.display_name}」成為「${nextRoleName}」嗎？`,
+            title
+        );
+        if (!confirmed) return;
+        handleUpdateRole(user.id, newRoleId);
+    };
+
+    const fetchManagerPatients = async (manager) => {
+        setSelectedManager(manager);
+        setLoadingPatients(true);
+        try {
+            const [assignedData, patientsData] = await Promise.all([
+                managementApi.getManagerAssignedUsers(manager.id),
+                managementApi.getPatients(),
+            ]);
+            const assignedItems = Array.isArray(assignedData) ? assignedData : [];
+            setManagerPatients(assignedItems);
+            setAllPatients(Array.isArray(patientsData) ? patientsData : []);
+            setSelectedPatientIds(assignedItems.map(patient => String(patient.id)));
+            setPatientSearch('');
+            setPatientGenderFilter('all');
+            setPatientRoleFilter('all');
+            setPatientAgeMin('');
+            setPatientAgeMax('');
+        } catch (error) {
+            console.error('Failed to fetch manager patients', error);
+            setManagerPatients([]);
+            setAllPatients([]);
+        }
+        setLoadingPatients(false);
+    };
+
+    const toggleSelectedPatient = (patientId) => {
+        const value = String(patientId);
+        setSelectedPatientIds(prev => (
+            prev.includes(value) ? prev.filter(id => id !== value) : [...prev, value]
+        ));
+    };
+
+    const filteredAssignablePatients = useMemo(() => {
+        const keyword = patientSearch.trim().toLowerCase();
+        const minAge = patientAgeMin === '' ? null : Number(patientAgeMin);
+        const maxAge = patientAgeMax === '' ? null : Number(patientAgeMax);
+        return allPatients.filter(patient => {
+            const age = calculateAge(patient.details?.birthday);
+            const gender = getPatientGenderValue(patient);
+            const roleName = patient.role?.name;
+            const matchesKeyword = !keyword || [
+                patient.display_name,
+                patient.username,
+                patient.details?.nation_id,
+                patient.details?.phone_number,
+            ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+            if (!matchesKeyword) return false;
+            if (patientGenderFilter !== 'all' && gender !== patientGenderFilter) return false;
+            if (patientRoleFilter !== 'all' && roleName !== patientRoleFilter) return false;
+            if (minAge !== null && (age === null || age < minAge)) return false;
+            if (maxAge !== null && (age === null || age > maxAge)) return false;
+            return true;
+        });
+    }, [allPatients, patientAgeMax, patientAgeMin, patientGenderFilter, patientRoleFilter, patientSearch]);
+
+    const handleSelectAllFilteredPatients = () => {
+        const nextIds = new Set(selectedPatientIds);
+        filteredAssignablePatients.forEach(patient => nextIds.add(String(patient.id)));
+        setSelectedPatientIds([...nextIds]);
+    };
+
+    const handleClearFilteredPatients = () => {
+        const filteredIds = new Set(filteredAssignablePatients.map(patient => String(patient.id)));
+        setSelectedPatientIds(prev => prev.filter(id => !filteredIds.has(id)));
+    };
+
+    const handleSaveManagerPatients = async () => {
+        if (!selectedManager) return;
+        const originalIds = managerPatients.map(patient => String(patient.id));
+        const nextIds = selectedPatientIds.map(String);
+        const idsToAdd = nextIds.filter(patientId => !originalIds.includes(patientId));
+        const idsToRemove = originalIds.filter(patientId => !nextIds.includes(patientId));
+        if (idsToAdd.length === 0 && idsToRemove.length === 0) {
+            setSelectedManager(null);
+            return;
+        }
+
+        setIsSavingAssignments(true);
+        try {
+            await Promise.all([
+                ...idsToAdd.map(patientId => managementApi.assignUser({
+                    user_id: parseInt(patientId),
+                    manager_id: selectedManager.id,
+                })),
+                ...idsToRemove.map(patientId => managementApi.unassignUser({
+                    user_id: parseInt(patientId),
+                    manager_id: selectedManager.id,
+                })),
+            ]);
+            showToast('個案指派已更新', 'success');
+            setSelectedManager(null);
+        } catch (error) {
+            showToast('個案指派更新失敗: ' + error.message, 'error');
+            fetchManagerPatients(selectedManager);
+        } finally {
+            setIsSavingAssignments(false);
+        }
+    };
+
+    const getRoleBadge = (roleId) => {
+        switch (roleId) {
+            case 1: return <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">超級管理員</span>;
+            case 2: return <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">個管師</span>;
+            case 5: return <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">待審核</span>;
+            default: return <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-bold rounded-full">未知 ({roleId})</span>;
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 className="text-2xl font-lora font-bold text-primary">後端帳號管理</h2>
+                    <p className="text-text/60 mt-1">審核及管理系統管理員與個案管理員帳號</p>
+                </div>
+                <button 
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-5 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-light transition-colors cursor-pointer shadow-sm flex items-center space-x-2"
+                >
+                    <span>+ 新增後端帳號</span>
+                </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-sky-100/50 overflow-hidden">
+                <div className="p-4 border-b border-sky-100/50 flex flex-col sm:flex-row gap-4 justify-between bg-sky-50/30">
+                    <div className="flex space-x-2">
+                        <select 
+                            className="px-4 py-2 border border-sky-200 rounded-lg bg-white text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                            value={filterRole}
+                            onChange={(e) => setFilterRole(e.target.value)}
+                        >
+                            <option value="">所有角色</option>
+                            <option value="1">超級管理員</option>
+                            <option value="2">個管師</option>
+                            <option value="5">待審核</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-sky-50/50 text-text/60 text-sm font-medium border-b border-sky-100/50">
+                                <th className="py-4 px-6">使用者名稱</th>
+                                <th className="py-4 px-6">顯示名稱</th>
+                                <th className="py-4 px-6">當前角色</th>
+                                <th className="py-4 px-6 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-sky-100/50">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan="4" className="py-10 text-center text-text/40">載入中...</td>
+                                </tr>
+                            ) : users.length === 0 ? (
+                                <tr>
+                                    <td colSpan="4" className="py-10 text-center text-text/40">查無資料</td>
+                                </tr>
+                            ) : users.map((u) => (
+                                <tr key={u.id} className="hover:bg-primary/5 transition-colors">
+                                    <td className="py-4 px-6 font-medium text-text font-mono text-sm">{u.username}</td>
+                                    <td className="py-4 px-6 text-text/70">{u.display_name}</td>
+                                    <td className="py-4 px-6">{getRoleBadge(u.role_id)}</td>
+                                    <td className="py-4 px-6">
+                                        <div className="flex justify-center space-x-2">
+                                            {u.role_id === 2 && (
+                                                <button 
+                                                    onClick={() => fetchManagerPatients(u)}
+                                                    className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors flex items-center space-x-1"
+                                                    title="查看負責病患"
+                                                >
+                                                    <Users size={18} />
+                                                    <span className="text-xs font-bold">查看個案</span>
+                                                </button>
+                                            )}
+                                            {u.role_id === 5 ? (
+                                                <>
+                                                    <button 
+                                                        onClick={() => handleConfirmUpdateRole(u, 2)}
+                                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                        title="核准為個管師"
+                                                    >
+                                                        <UserCheck size={20} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleConfirmUpdateRole(u, 1)}
+                                                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                        title="核准為超級管理員"
+                                                    >
+                                                        <Shield size={20} />
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button 
+                                                    onClick={async () => {
+                                                        const newPassword = window.prompt(`重設 ${u.display_name} 的密碼:`, "");
+                                                        if (newPassword) {
+                                                            try {
+                                                                await managementApi.updateUser(u.id, { password: newPassword });
+                                                                alert('密碼重設成功');
+                                                            } catch (e) { alert('重設失敗: ' + e.message); }
+                                                        }
+                                                    }}
+                                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                                    title="重設密碼"
+                                                >
+                                                    <Clock size={20} />
+                                                </button>
+                                            )}
+                                            {u.role_id !== 5 && u.role_id !== 1 && (
+                                                <button 
+                                                    onClick={() => handleConfirmUpdateRole(u, 5)}
+                                                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    title="取消權限 (設為待審核)"
+                                                >
+                                                    <UserX size={20} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Create Backend User Modal */}
+            {showCreateModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-sky-100">
+                        <div className="p-6 border-b border-sky-100 bg-sky-50/50">
+                            <h3 className="text-xl font-bold text-primary">建立後端管理帳號</h3>
+                            <p className="text-sm text-text/50 mt-1">手動建立具備管理權限的帳號</p>
+                        </div>
+                        
+                        <form onSubmit={handleCreateBackendUser} className="p-6 space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">帳號 (Username)</label>
+                                <input
+                                    required
+                                    type="text"
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                                    placeholder="建議使用 Email，例如：manager@example.com"
+                                    value={createFormData.username}
+                                    onChange={(e) => setCreateFormData({...createFormData, username: e.target.value})}
+                                />
+                                <p className="text-[11px] font-bold text-text/40 ml-1">若角色為個管師且帳號為 Email，系統會自動寄送帳號通知信。</p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">顯示名稱 (Display Name)</label>
+                                <input
+                                    required
+                                    type="text"
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    placeholder="例如：李專員"
+                                    value={createFormData.display_name}
+                                    onChange={(e) => setCreateFormData({...createFormData, display_name: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">初始密碼 (Password)</label>
+                                <input
+                                    required
+                                    type="password"
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    placeholder="個管師預設為 000000"
+                                    value={createFormData.password}
+                                    onChange={(e) => setCreateFormData({...createFormData, password: e.target.value})}
+                                />
+                                <p className="text-[11px] font-bold text-text/40 ml-1">建立個管師帳號時，通知信會帶入此初始密碼。</p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-text/60 ml-1">指派角色</label>
+                                <select
+                                    className="w-full px-4 py-2.5 border border-sky-100 rounded-xl bg-sky-50/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={createFormData.role_id}
+                                    onChange={(e) => {
+                                        const nextRoleId = e.target.value;
+                                        setCreateFormData({
+                                            ...createFormData,
+                                            role_id: nextRoleId,
+                                            password: nextRoleId === '2' && !createFormData.password ? DEFAULT_MANAGER_PASSWORD : createFormData.password
+                                        });
+                                    }}
+                                >
+                                    <option value={2}>個案管理師 (Manager)</option>
+                                    <option value={1}>超級管理員 (Admin)</option>
+                                </select>
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCreateModal(false)}
+                                    className="flex-1 py-3 px-4 border border-sky-200 text-text/60 rounded-xl font-bold hover:bg-sky-50 transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-3 px-4 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition-shadow shadow-lg shadow-primary/20"
+                                >
+                                    建立帳號
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Manager Patients Modal */}
+            {selectedManager && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden border border-sky-100">
+                        <div className="p-6 border-b border-sky-100 flex justify-between items-center bg-sky-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-primary flex items-center space-x-2">
+                                    <Users size={24} />
+                                    <span>指派個案給 {selectedManager.display_name}</span>
+                                </h3>
+                                <p className="text-xs text-text/50 mt-1 font-mono">
+                                    {selectedManager.username} / 已選 {selectedPatientIds.length} 位
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setSelectedManager(null)}
+                                disabled={isSavingAssignments}
+                                className="p-2 hover:bg-white rounded-full text-text/40 hover:text-text transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {loadingPatients ? (
+                                <div className="text-center py-10 text-text/40">載入病患清單中...</div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
+                                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_150px_170px_1fr]">
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">搜尋個案</span>
+                                                <div className="relative">
+                                                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text/35" />
+                                                    <input
+                                                        type="search"
+                                                        className="w-full min-h-10 rounded-lg border border-sky-100 bg-white pl-9 pr-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        placeholder="姓名、帳號、身分證、電話，例如 S0"
+                                                        value={patientSearch}
+                                                        onChange={(event) => setPatientSearch(event.target.value)}
+                                                    />
+                                                </div>
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">性別</span>
+                                                <select
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={patientGenderFilter}
+                                                    onChange={(event) => setPatientGenderFilter(event.target.value)}
+                                                >
+                                                    <option value="all">全部</option>
+                                                    <option value="male">男</option>
+                                                    <option value="female">女</option>
+                                                    <option value="other">其他/未知</option>
+                                                </select>
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">實驗/對照組</span>
+                                                <select
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={patientRoleFilter}
+                                                    onChange={(event) => setPatientRoleFilter(event.target.value)}
+                                                >
+                                                    <option value="all">全部</option>
+                                                    <option value="實驗組">實驗組</option>
+                                                    <option value="對照組">對照組</option>
+                                                </select>
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <label className="space-y-1">
+                                                    <span className="text-[11px] font-bold text-text/50">最小年齡</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        value={patientAgeMin}
+                                                        onChange={(event) => setPatientAgeMin(event.target.value)}
+                                                    />
+                                                </label>
+                                                <label className="space-y-1">
+                                                    <span className="text-[11px] font-bold text-text/50">最大年齡</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        value={patientAgeMax}
+                                                        onChange={(event) => setPatientAgeMax(event.target.value)}
+                                                    />
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 flex flex-col gap-2 text-xs font-bold text-text/45 sm:flex-row sm:items-center sm:justify-between">
+                                            <span>顯示 {filteredAssignablePatients.length} / {allPatients.length} 位個案，目前已指派 {managerPatients.length} 位</span>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSelectAllFilteredPatients}
+                                                    disabled={filteredAssignablePatients.length === 0 || isSavingAssignments}
+                                                    className="rounded-lg border border-sky-100 bg-white px-3 py-1.5 text-primary hover:bg-sky-50 disabled:opacity-50"
+                                                >
+                                                    全選篩選結果
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClearFilteredPatients}
+                                                    disabled={filteredAssignablePatients.length === 0 || isSavingAssignments}
+                                                    className="rounded-lg border border-sky-100 bg-white px-3 py-1.5 text-primary hover:bg-sky-50 disabled:opacity-50"
+                                                >
+                                                    取消篩選結果
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPatientSearch('');
+                                                        setPatientGenderFilter('all');
+                                                        setPatientRoleFilter('all');
+                                                        setPatientAgeMin('');
+                                                        setPatientAgeMax('');
+                                                    }}
+                                                    className="rounded-lg border border-sky-100 bg-white px-3 py-1.5 text-text/55 hover:bg-sky-50"
+                                                >
+                                                    清除篩選
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-sky-100 bg-slate-50 p-2">
+                                        {allPatients.length === 0 ? (
+                                            <p className="py-8 text-center text-sm text-text/40">目前沒有可指派的個案</p>
+                                        ) : filteredAssignablePatients.length === 0 ? (
+                                            <p className="py-8 text-center text-sm text-text/40">沒有符合篩選條件的個案</p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                                                {filteredAssignablePatients.map(patient => {
+                                                    const patientId = String(patient.id);
+                                                    const checked = selectedPatientIds.includes(patientId);
+                                                    const age = calculateAge(patient.details?.birthday);
+                                                    const gender = getPatientGenderValue(patient);
+                                                    return (
+                                                        <label
+                                                            key={patient.id}
+                                                            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
+                                                                checked ? 'border-primary/30 bg-primary/5' : 'border-transparent bg-white hover:border-sky-200'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary/20"
+                                                                checked={checked}
+                                                                disabled={isSavingAssignments}
+                                                                onChange={() => toggleSelectedPatient(patient.id)}
+                                                            />
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="min-w-0">
+                                                                        <p className="truncate text-sm font-bold text-text">{patient.display_name}</p>
+                                                                        <p className="truncate text-xs font-mono text-text/40">@{patient.username} / {patient.details?.nation_id || '無身分代碼'}</p>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => {
+                                                                            event.preventDefault();
+                                                                            navigate(`/patients/${patient.id}`);
+                                                                        }}
+                                                                        className="rounded-lg p-1 text-primary hover:bg-sky-50"
+                                                                        title="查看個案"
+                                                                    >
+                                                                        <ArrowRight size={16} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                                                                    <span className="rounded-md bg-sky-100 px-2 py-0.5 text-primary">
+                                                                        {patient.role?.name || '未分組'}
+                                                                    </span>
+                                                                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-text/50">
+                                                                        {gender === 'male' ? '男' : gender === 'female' ? '女' : '未知'}
+                                                                        {age !== null ? ` / ${age}歲` : ''}
+                                                                    </span>
+                                                                    <span className="rounded-md bg-green-100 px-2 py-0.5 text-green-700">
+                                                                        {patient.details?.sarcopenia_level || '未分級'} 級
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between gap-3 border-t border-sky-100 bg-sky-50/20 p-6">
+                            <p className="text-xs font-bold text-text/45">
+                                儲存後會新增或解除此個管師與個案的指派關係。
+                            </p>
+                            <div className="flex gap-3">
+                            <button 
+                                onClick={() => setSelectedManager(null)}
+                                disabled={isSavingAssignments}
+                                className="px-6 py-2 bg-white border border-sky-200 text-text/70 rounded-xl font-bold hover:bg-sky-50 transition-colors text-sm disabled:opacity-50"
+                            >
+                                關閉
+                            </button>
+                                <button
+                                    onClick={handleSaveManagerPatients}
+                                    disabled={isSavingAssignments || loadingPatients}
+                                    className="rounded-xl bg-primary px-6 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-light disabled:opacity-50"
+                                >
+                                    {isSavingAssignments ? '儲存中...' : '儲存指派'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default BackendUserManagement;

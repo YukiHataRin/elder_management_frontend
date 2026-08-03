@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-text bg-background font-raleway antialiased selection:bg-primary-light selection:text-white;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-lora font-semibold text-primary;
+  }
+  select {
+    @apply text-text bg-white;
+    color: #0C4A6E;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+  }
+  select option {
+    color: #0C4A6E;
+    background-color: #FFFFFF;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+  }
+}

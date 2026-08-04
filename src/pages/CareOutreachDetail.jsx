@@ -16,7 +16,11 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
-import { careOutreachApi } from '../api/careOutreach';
+import {
+  CARE_OUTREACH_REASON_LABELS,
+  CARE_OUTREACH_SOURCE_LABELS,
+  careOutreachApi,
+} from '../api/careOutreach';
 import { managementApi } from '../api/management';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
@@ -32,13 +36,6 @@ const severityStyles = {
   high: 'border-orange-200 bg-orange-50 text-orange-700',
   normal: 'border-amber-200 bg-amber-50 text-amber-700',
   low: 'border-sky-200 bg-sky-50 text-sky-700',
-};
-
-const sourceLabels = {
-  ai_safety: 'AI 安全警示',
-  questionnaire_validation: '問卷資料檢核',
-  questionnaire_query: '問卷資料檢核',
-  questionnaire: '問卷資料檢核',
 };
 
 const reasonOptions = [
@@ -59,7 +56,7 @@ const reasonOptions = [
   ['other', '其他'],
 ];
 
-const sourceLabel = (source) => sourceLabels[source] || (source ? '其他系統來源' : '未分類來源');
+const sourceLabel = (source) => CARE_OUTREACH_SOURCE_LABELS[source] || (source ? '其他系統來源' : '未分類來源');
 
 const formatDateTime = (value) => {
   if (!value) return '未記錄';
@@ -92,12 +89,94 @@ const getAssignedManagerId = (item) => item?.assigned_manager_user_id || item?.a
 
 const getSource = (trigger) => trigger?.source || trigger?.source_type || trigger?.trigger_type || '';
 
+const numberOrNull = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const formatDateOnly = (value) => {
+  if (!value) return '未記錄';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '未記錄';
+  return new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+};
+
+const domainLabels = {
+  muscle_frailty: '肌力',
+  muscle: '肌力',
+  oral_frailty: '口腔',
+  oral: '口腔',
+  psychology: '心理',
+  mental: '心理',
+};
+
+const distanceGradeLabels = {
+  within_radius: '半徑內',
+  inside_radius: '半徑內',
+  near_radius: '接近半徑上限',
+  outside_radius: '曾超出半徑',
+  far_outside: '明顯超出半徑',
+  a: '半徑內',
+  b: '接近半徑上限',
+  c: '曾超出半徑',
+};
+
+const missionDomainDetails = (evidence) => {
+  const source = evidence?.domains || evidence?.domain_details || evidence?.domainDetails || evidence?.domain_stats || [];
+  const entries = Array.isArray(source) ? source.map((item) => [item?.domain_code || item?.code || '', item]) : Object.entries(source);
+  return entries.map(([code, item]) => {
+    const completed = numberOrNull(item?.completed_count ?? item?.completed);
+    const eligible = numberOrNull(item?.eligible_count ?? item?.eligible);
+    const recordedPercent = numberOrNull(item?.completion_rate_percent ?? item?.percent ?? item?.completion_rate);
+    const percent = recordedPercent ?? (completed !== null && eligible ? (completed / eligible) * 100 : null);
+    return {
+      label: domainLabels[code] || '其他領域',
+      completed,
+      eligible,
+      percent,
+    };
+  }).filter((item) => item.completed !== null || item.eligible !== null || item.percent !== null);
+};
+
 const triggerSummary = (trigger) => {
   const evidence = trigger?.evidence || {};
-  if (getSource(trigger) === 'questionnaire_validation') {
+  const source = getSource(trigger);
+  if (source === 'mission_usage') {
+    const cycleStart = evidence.cycle_start || evidence.cycleStart || evidence.period?.start;
+    const cycleEnd = evidence.cycle_end || evidence.cycleEnd || evidence.period?.end;
+    const cycleLabel = cycleStart || cycleEnd ? `任務週期 ${formatDateOnly(cycleStart)}－${formatDateOnly(cycleEnd)}` : '任務週期未記錄';
+    const domains = missionDomainDetails(evidence);
+    const domainLabel = domains.length > 0
+      ? domains.map((domain) => `${domain.label} ${domain.completed ?? '—'}/${domain.eligible ?? '—'}（${domain.percent === null ? '—' : `${domain.percent.toFixed(2).replace(/\.00$/, '')}%`}）`).join('；')
+      : '尚無領域統計';
+    return `${cycleLabel}：${domainLabel}`;
+  }
+  if (source === 'gps_inactivity') {
+    const validDays = numberOrNull(evidence.valid_days ?? evidence.valid_gps_days ?? evidence.valid_days_count);
+    const radius = numberOrNull(evidence.radius_meters ?? evidence.radiusMeters);
+    const rawGrade = evidence.max_distance_grade || evidence.distance_grade || evidence.max_distance_bucket;
+    const grade = distanceGradeLabels[String(rawGrade || '').toLowerCase()] || '未分級';
+    return `近 7 日有效 GPS 日：${validDays === null ? '未記錄' : `${validDays} 日`}；半徑：${radius === null ? '未記錄' : `${radius} 公尺`}；最大距離分級：${grade}`;
+  }
+  if (source === 'app_activity') {
+    const windowStart = evidence.window_start || evidence.windowStart || evidence.window?.start;
+    const windowEnd = evidence.window_end || evidence.windowEnd || evidence.window?.end;
+    const windowDays = numberOrNull(evidence.window_days ?? evidence.windowDays);
+    const windowLabel = windowStart || windowEnd
+      ? `${formatDateOnly(windowStart)}－${formatDateOnly(windowEnd)}`
+      : windowDays === null ? '未記錄' : `近 ${windowDays} 日`;
+    const eventCount = numberOrNull(evidence.event_count ?? evidence.eventCount);
+    const lastActivity = evidence.last_activity_at || evidence.lastActivityAt || evidence.last_activity || evidence.last_event_at;
+    return `分析期間：${windowLabel}；事件數：${eventCount === null ? '未記錄' : eventCount}；最近活動：${formatDateTime(lastActivity)}`;
+  }
+  if (source === 'manual_outreach') {
+    const reasonCode = trigger?.reason_code || evidence.reason_code || evidence.reasonCode;
+    return `人工原因：${CARE_OUTREACH_REASON_LABELS[reasonCode] || '未提供可辨識原因'}`;
+  }
+  if (['questionnaire_validation', 'questionnaire_query', 'questionnaire'].includes(source)) {
     const questionnaire = evidence.template_title || '問卷';
     const field = evidence.field_label || '欄位';
-    return `${questionnaire}：${field}需要確認${evidence.rule_text ? `（${evidence.rule_text}）` : ''}`;
+    return `${questionnaire}：${field}需要確認`;
   }
   const riskLabels = {
     self_harm_or_suicide: '對話出現自傷或自殺相關安全訊號',

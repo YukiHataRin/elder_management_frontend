@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
-import { Bell, Clock, KeyRound, Users, ClipboardList, Trophy, Settings, LogOut, X, FileText, MessagesSquare } from 'lucide-react';
+import { Bell, Clock, HeartHandshake, KeyRound, Users, ClipboardList, Trophy, Settings, LogOut, X, FileText, MessagesSquare } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
 import { managementApi } from '../api/management';
 import { managerNotificationsApi } from '../api/managerNotifications';
+
+const careOutreachEnabled = import.meta.env.VITE_CARE_OUTREACH_ENABLED === 'true';
 
 const Layout = ({ children }) => {
     const location = useLocation();
@@ -81,6 +83,7 @@ const Layout = ({ children }) => {
     const navItems = [
         { path: '/patients', label: '個案管理', icon: <Users size={20} /> },
         { path: '/notifications', label: '通知中心', icon: <Bell size={20} />, badge: notificationUnread },
+        ...(careOutreachEnabled ? [{ path: '/care-outreach', label: '關懷案件', icon: <HeartHandshake size={20} /> }] : []),
         { path: '/chats', label: 'AI 對話紀錄', icon: <MessagesSquare size={20} /> },
         { path: '/questionnaires', label: '問卷管理', icon: <FileText size={20} /> },
         { path: '/tasks', label: '任務庫管理', icon: <ClipboardList size={20} /> },

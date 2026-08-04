@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchBlob } from './client';
+import { API_BASE_URL, apiFetch, apiFetchBlob } from './client';
 
 export const managementApi = {
   // --- 使用者管理 ---
@@ -238,7 +238,7 @@ export const authApi = {
     params.append('password', password);
 
     // V2 登入路徑: /auth/login
-    const response = await fetch('https://api.eldercare.fclinlab.com/api/v2/auth/login', {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

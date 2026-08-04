@@ -1,4 +1,5 @@
-const API_BASE_URL = 'https://api.eldercare.fclinlab.com/api/v2';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || 'https://api.eldercare.fclinlab.com/api/v2';
 
 const getHeaders = () => {
   const token = localStorage.getItem('token');

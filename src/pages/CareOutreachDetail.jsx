@@ -247,6 +247,13 @@ const CareOutreachDetail = () => {
   const isClosed = ['resolved', 'false_positive'].includes(caseData?.status);
   const severity = caseData?.highest_severity || caseData?.severity || 'low';
   const isOverdue = Boolean(caseData?.overdue) || (!isClosed && caseData?.due_at && new Date(caseData.due_at).getTime() < Date.now());
+  const currentUserId = Number(user?.id ?? user?.user_id);
+  const assignedManagerId = Number(getAssignedManagerId(caseData));
+  const hasProcessingOwnership = isAdmin || (
+    Number.isFinite(currentUserId)
+    && assignedManagerId === currentUserId
+    && Boolean(caseData?.acknowledged_at)
+  );
 
   const managerItems = useMemo(() => {
     if (Array.isArray(managers)) return managers;
@@ -370,17 +377,19 @@ const CareOutreachDetail = () => {
             <p className="mt-3 text-xs text-text/45">案件編號 #{caseData.id} · 建立於 {formatDateTime(caseData.created_at)}</p>
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
-            {!isClosed && ['open', 'acknowledged'].includes(caseData.status) && <button type="button" onClick={() => openAction('take_ownership')} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white hover:bg-primary-light"><UserCheck size={16} />接手</button>}
-            {!isClosed && <button type="button" onClick={openContact} className="inline-flex h-10 items-center gap-2 rounded-lg border border-sky-200 bg-white px-4 text-sm font-bold text-primary hover:bg-sky-50"><Phone size={16} />新增聯絡</button>}
-            {!isClosed && caseData.status !== 'monitoring' && caseData.status !== 'open' && <button type="button" onClick={() => openAction('monitor')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-sky-200 bg-white px-4 text-sm font-bold text-primary hover:bg-sky-50"><Clock3 size={16} />開始追蹤</button>}
+            {!isClosed && !hasProcessingOwnership && <button type="button" onClick={() => openAction('take_ownership')} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white hover:bg-primary-light"><UserCheck size={16} />接手</button>}
+            {!isClosed && hasProcessingOwnership && <button type="button" onClick={openContact} className="inline-flex h-10 items-center gap-2 rounded-lg border border-sky-200 bg-white px-4 text-sm font-bold text-primary hover:bg-sky-50"><Phone size={16} />新增聯絡</button>}
+            {!isClosed && hasProcessingOwnership && ['acknowledged', 'contacted'].includes(caseData.status) && <button type="button" onClick={() => openAction('monitor')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-sky-200 bg-white px-4 text-sm font-bold text-primary hover:bg-sky-50"><Clock3 size={16} />開始追蹤</button>}
             {!isClosed && isAdmin && <button type="button" onClick={() => openAction('assign')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-sky-200 bg-white px-4 text-sm font-bold text-primary hover:bg-sky-50"><UsersRound size={16} />指派</button>}
-            {!isClosed && <button type="button" onClick={() => openAction('false_positive')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50"><AlertTriangle size={16} />誤判</button>}
-            {!isClosed && <button type="button" onClick={() => openAction('resolve')} className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700"><CheckCircle2 size={16} />結案</button>}
+            {!isClosed && hasProcessingOwnership && ['contacted', 'monitoring'].includes(caseData.status) && <button type="button" onClick={() => openAction('false_positive')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 hover:bg-rose-50"><AlertTriangle size={16} />誤判</button>}
+            {!isClosed && hasProcessingOwnership && ['contacted', 'monitoring'].includes(caseData.status) && <button type="button" onClick={() => openAction('resolve')} className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700"><CheckCircle2 size={16} />結案</button>}
           </div>
         </div>
-        <div className="grid gap-4 p-5 text-sm md:grid-cols-3">
+        {!isClosed && !hasProcessingOwnership && <div className="border-b border-sky-100 bg-amber-50/70 px-5 py-3 text-sm font-medium text-amber-800">請先接手案件，才能新增聯絡紀錄、追蹤或結案。</div>}
+        <div className="grid gap-4 p-5 text-sm md:grid-cols-2 xl:grid-cols-4">
           <div><p className="text-xs font-bold text-text/45">到期時間</p><p className={`mt-1 font-medium ${isOverdue ? 'text-rose-700' : 'text-text'}`}>{formatDateTime(caseData.due_at)}{isOverdue ? '（已逾期）' : ''}</p></div>
           <div><p className="text-xs font-bold text-text/45">負責個管師</p><p className="mt-1 font-medium text-text">{caseData.assigned_manager_name || caseData.assigned_manager?.display_name || (getAssignedManagerId(caseData) ? `帳號 #${getAssignedManagerId(caseData)}` : '尚未指派')}</p></div>
+          <div><p className="text-xs font-bold text-text/45">案件週期</p><p className="mt-1 font-medium text-text">{formatDateOnly(caseData.cycle_start)}－{formatDateOnly(caseData.cycle_end)}</p></div>
           <div><p className="text-xs font-bold text-text/45">最近更新</p><p className="mt-1 font-medium text-text">{formatDateTime(caseData.updated_at || caseData.created_at)}</p></div>
         </div>
       </section>
@@ -393,7 +402,7 @@ const CareOutreachDetail = () => {
 
         <section className="rounded-lg border border-sky-100 bg-white shadow-sm">
           <div className="flex items-center gap-2 border-b border-sky-100 px-5 py-4"><MessageCircle size={18} className="text-primary/65" /><h2 className="font-bold text-text">聯絡紀錄</h2><span className="ml-auto text-xs text-text/40">{contacts.length} 筆</span></div>
-          {contacts.length === 0 ? <div className="p-5"><p className="text-sm text-text/45">尚無人工聯絡紀錄</p>{!isClosed && <button type="button" onClick={openContact} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-sky-200 px-3 py-2 text-sm font-bold text-primary hover:bg-sky-50"><Phone size={15} />新增聯絡</button>}</div> : <div className="divide-y divide-sky-50">{contacts.map((contact) => <div key={contact.id || contact.contacted_at} className="px-5 py-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold text-text">{contact.channel || '未記錄方式'} · {contact.outcome || '未記錄結果'}</p><p className="mt-1 text-xs text-text/45">{formatDateTime(contact.contacted_at)} · {contact.recorded_by_name_snapshot || contact.recorded_by_name || '未記錄人員'}</p></div><Phone size={16} className="mt-0.5 text-primary/45" /></div>{contact.intervention_note && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-sky-50/70 p-3 text-sm leading-6 text-text/75">{contact.intervention_note}</p>}{contact.follow_up_at && <p className="mt-2 text-xs text-text/45">下次追蹤：{formatDateTime(contact.follow_up_at)}</p>}</div>)}</div>}
+          {contacts.length === 0 ? <div className="p-5"><p className="text-sm text-text/45">尚無人工聯絡紀錄</p>{!isClosed && hasProcessingOwnership && <button type="button" onClick={openContact} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-sky-200 px-3 py-2 text-sm font-bold text-primary hover:bg-sky-50"><Phone size={15} />新增聯絡</button>}</div> : <div className="divide-y divide-sky-50">{contacts.map((contact) => <div key={contact.id || contact.contacted_at} className="px-5 py-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold text-text">{contact.channel || '未記錄方式'} · {contact.outcome || '未記錄結果'}</p><p className="mt-1 text-xs text-text/45">{formatDateTime(contact.contacted_at)} · {contact.recorded_by_name_snapshot || contact.recorded_by_name || '未記錄人員'}</p></div><Phone size={16} className="mt-0.5 text-primary/45" /></div>{contact.intervention_note && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-sky-50/70 p-3 text-sm leading-6 text-text/75">{contact.intervention_note}</p>}{contact.follow_up_at && <p className="mt-2 text-xs text-text/45">下次追蹤：{formatDateTime(contact.follow_up_at)}</p>}</div>)}</div>}
         </section>
       </div>
 

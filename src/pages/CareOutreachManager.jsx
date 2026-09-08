@@ -98,6 +98,15 @@ const formatDateTime = (value) => {
   }).format(date);
 };
 
+const formatDateOnly = (value) => {
+  if (!value) return '未記錄';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '未記錄';
+  return new Intl.DateTimeFormat('zh-TW', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(date);
+};
+
 const getPatientItems = (payload) => {
   if (Array.isArray(payload)) return payload;
   return payload?.items || payload?.users || payload?.patients || payload?.data || [];
@@ -460,9 +469,10 @@ const CareOutreachManager = () => {
                         {overdue && <span className="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-2 py-0.5 font-bold text-rose-700"><CalendarClock size={12} />已逾期</span>}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-text/50 lg:min-w-[300px] lg:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-text/50 lg:min-w-[520px] lg:grid-cols-4">
                       <span>期限：{formatDateTime(item.due_at)}</span>
                       <span>建立：{formatDateTime(item.created_at)}</span>
+                      <span>週期：{formatDateOnly(item.cycle_start)}－{formatDateOnly(item.cycle_end)}</span>
                       <span>{item.assigned_manager_name ? `個管師：${item.assigned_manager_name}` : '尚未指派'}</span>
                     </div>
                   </div>

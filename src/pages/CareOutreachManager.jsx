@@ -179,6 +179,7 @@ const CareOutreachManager = () => {
     severity: '',
     source: '',
     overdue: false,
+    sort: 'newest',
   });
   const deferredSearch = useDeferredValue(filters.search.trim());
   const [page, setPage] = useState(1);
@@ -225,7 +226,7 @@ const CareOutreachManager = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [deferredSearch, filters.status, filters.severity, filters.source, filters.overdue]);
+  }, [deferredSearch, filters.status, filters.severity, filters.source, filters.overdue, filters.sort]);
 
   const items = useMemo(() => getItems(payload), [payload]);
   const total = getTotal(payload, items);
@@ -239,7 +240,7 @@ const CareOutreachManager = () => {
   };
 
   const resetFilters = () => {
-    setFilters({ search: '', status: 'active', severity: '', source: '', overdue: false });
+    setFilters({ search: '', status: 'active', severity: '', source: '', overdue: false, sort: 'newest' });
   };
 
   const loadPatients = useCallback(async () => {
@@ -412,7 +413,7 @@ const CareOutreachManager = () => {
           <h2 className="text-sm font-bold text-text">篩選案件</h2>
           <button type="button" onClick={resetFilters} className="ml-auto text-xs font-bold text-primary hover:underline">清除篩選</button>
         </div>
-        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[minmax(230px,1.5fr)_repeat(4,minmax(130px,1fr))]">
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(130px,1fr))]">
           <label className="relative block">
             <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text/35" />
             <input value={filters.search} onChange={(event) => updateFilter('search', event.target.value)} placeholder="搜尋姓名或帳號" aria-label="搜尋關懷案件" className="h-10 w-full rounded-lg border border-sky-100 bg-sky-50/20 pl-10 pr-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10" />
@@ -429,6 +430,10 @@ const CareOutreachManager = () => {
           <select value={filters.source} onChange={(event) => updateFilter('source', event.target.value)} aria-label="案件來源" className="h-10 rounded-lg border border-sky-100 px-3 text-sm font-medium">
             <option value="">全部來源</option>
             {sourceFilterOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select value={filters.sort} onChange={(event) => updateFilter('sort', event.target.value)} aria-label="案件排序方式" className="h-10 rounded-lg border border-sky-100 px-3 text-sm font-medium">
+            <option value="newest">最新案件優先</option>
+            <option value="priority">處理優先順序</option>
           </select>
           <label className="flex h-10 items-center gap-2 rounded-lg border border-sky-100 px-3 text-sm font-medium text-text/75">
             <input type="checkbox" checked={filters.overdue} onChange={(event) => updateFilter('overdue', event.target.checked)} className="h-4 w-4 accent-primary" />

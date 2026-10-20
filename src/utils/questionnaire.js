@@ -27,6 +27,8 @@ export const getQuestionnaireFieldGroups = (questionnaireOrSchema) => {
           id: section.code || section.id || `section_${index}`,
           title: section.title || section.code || `第 ${index + 1} 區`,
           fields: section.fields,
+          referenceImage: section.reference_image || section.referenceImage,
+          referenceImages: section.reference_images || section.referenceImages,
         });
       }
     });

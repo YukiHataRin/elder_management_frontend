@@ -6,10 +6,17 @@ import QuestionnaireFill from './pages/QuestionnaireFill';
 import QuestionnaireManager from './pages/QuestionnaireManager';
 import TaskManager from './pages/TaskManager';
 import Gamification from './pages/Gamification';
+import ChatCareManager from './pages/ChatCareManager';
+import NotificationCenter from './pages/NotificationCenter';
+import PushCampaignManager from './pages/PushCampaignManager';
+import CareOutreachManager from './pages/CareOutreachManager';
+import CareOutreachDetail from './pages/CareOutreachDetail';
 import BackendUserManagement from './pages/BackendUserManagement';
 import Login from './pages/Login';
 import { useAuth } from './context/useAuth';
 import { ToastProvider } from './context/ToastContext';
+
+const careOutreachEnabled = import.meta.env.VITE_CARE_OUTREACH_ENABLED === 'true';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -45,6 +52,11 @@ function App() {
           <Route path="/questionnaires" element={<ProtectedRoute><QuestionnaireManager /></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute><TaskManager /></ProtectedRoute>} />
           <Route path="/gamification" element={<ProtectedRoute><Gamification /></ProtectedRoute>} />
+          <Route path="/chats" element={<ProtectedRoute><ChatCareManager /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationCenter /></ProtectedRoute>} />
+          <Route path="/push-campaigns" element={<ProtectedRoute><PushCampaignManager /></ProtectedRoute>} />
+          {careOutreachEnabled && <Route path="/care-outreach" element={<ProtectedRoute><CareOutreachManager /></ProtectedRoute>} />}
+          {careOutreachEnabled && <Route path="/care-outreach/cases/:caseId" element={<ProtectedRoute><CareOutreachDetail /></ProtectedRoute>} />}
           
           {/* Admin only */}
           {isAdmin && (

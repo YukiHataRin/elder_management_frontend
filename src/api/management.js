@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchBlob } from './client';
+import { API_BASE_URL, apiFetch, apiFetchBlob } from './client';
 
 export const managementApi = {
   // --- 使用者管理 ---
@@ -186,8 +186,8 @@ export const managementApi = {
   // 獲取特定使用者的所有通知
   getUserNotifications: (userId) => apiFetch(`/management/notifications/${userId}`),
 
-  // 建立新通知 (發送推播)
-  createNotification: (data) => apiFetch('/management/notifications/', {
+  // 建立新通知並同步發送 Firebase 推播
+  createNotification: (data) => apiFetch('/management/notifications/send', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
@@ -238,7 +238,7 @@ export const authApi = {
     params.append('password', password);
 
     // V2 登入路徑: /auth/login
-    const response = await fetch('https://api.eldercare.fclinlab.com/api/v2/auth/login', {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

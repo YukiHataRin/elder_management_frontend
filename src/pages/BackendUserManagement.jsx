@@ -1,10 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { managementApi } from '../api/management';
 import { Shield, UserCheck, UserX, Clock, Search, Filter, Users, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/useToast';
+
+const roleNameById = {
+    1: '超級管理員',
+    2: '個管師',
+    5: '待審核',
+};
+
+const getPatientGenderValue = (patient) => {
+    const genderName = String(patient?.details?.gender?.name || '').toLowerCase();
+    const genderId = Number(patient?.details?.gender_id);
+    if (genderName.includes('female') || genderName.includes('女') || genderId === 2) return 'female';
+    if (genderName.includes('male') || genderName.includes('男') || genderId === 1) return 'male';
+    return 'other';
+};
+
+const calculateAge = (birthday) => {
+    if (!birthday) return null;
+    const birthDate = new Date(birthday);
+    if (Number.isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age -= 1;
+    return age >= 0 ? age : null;
+};
 
 const BackendUserManagement = () => {
     const navigate = useNavigate();
+    const { showToast, requestConfirm } = useToast();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterRole, setFilterRole] = useState('');
@@ -12,7 +39,15 @@ const BackendUserManagement = () => {
     // Modal states for viewing manager's patients
     const [selectedManager, setSelectedManager] = useState(null);
     const [managerPatients, setManagerPatients] = useState([]);
+    const [allPatients, setAllPatients] = useState([]);
+    const [selectedPatientIds, setSelectedPatientIds] = useState([]);
+    const [patientSearch, setPatientSearch] = useState('');
+    const [patientGenderFilter, setPatientGenderFilter] = useState('all');
+    const [patientRoleFilter, setPatientRoleFilter] = useState('all');
+    const [patientAgeMin, setPatientAgeMin] = useState('');
+    const [patientAgeMax, setPatientAgeMax] = useState('');
     const [loadingPatients, setLoadingPatients] = useState(false);
+    const [isSavingAssignments, setIsSavingAssignments] = useState(false);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const DEFAULT_MANAGER_PASSWORD = '000000';
@@ -67,17 +102,117 @@ const BackendUserManagement = () => {
         }
     };
 
+    const handleConfirmUpdateRole = async (user, newRoleId) => {
+        const isDemotion = newRoleId === 5;
+        const title = isDemotion ? '移除帳號權限' : '核准帳號';
+        const nextRoleName = roleNameById[newRoleId] || `角色 ${newRoleId}`;
+        const confirmed = await requestConfirm(
+            isDemotion
+                ? `確定要將「${user.display_name}」移回待審核狀態嗎？此帳號將無法使用後端管理功能。`
+                : `確定要核准「${user.display_name}」成為「${nextRoleName}」嗎？`,
+            title
+        );
+        if (!confirmed) return;
+        handleUpdateRole(user.id, newRoleId);
+    };
+
     const fetchManagerPatients = async (manager) => {
         setSelectedManager(manager);
         setLoadingPatients(true);
         try {
-            const data = await managementApi.getManagerAssignedUsers(manager.id);
-            setManagerPatients(data);
+            const [assignedData, patientsData] = await Promise.all([
+                managementApi.getManagerAssignedUsers(manager.id),
+                managementApi.getPatients(),
+            ]);
+            const assignedItems = Array.isArray(assignedData) ? assignedData : [];
+            setManagerPatients(assignedItems);
+            setAllPatients(Array.isArray(patientsData) ? patientsData : []);
+            setSelectedPatientIds(assignedItems.map(patient => String(patient.id)));
+            setPatientSearch('');
+            setPatientGenderFilter('all');
+            setPatientRoleFilter('all');
+            setPatientAgeMin('');
+            setPatientAgeMax('');
         } catch (error) {
             console.error('Failed to fetch manager patients', error);
             setManagerPatients([]);
+            setAllPatients([]);
         }
         setLoadingPatients(false);
+    };
+
+    const toggleSelectedPatient = (patientId) => {
+        const value = String(patientId);
+        setSelectedPatientIds(prev => (
+            prev.includes(value) ? prev.filter(id => id !== value) : [...prev, value]
+        ));
+    };
+
+    const filteredAssignablePatients = useMemo(() => {
+        const keyword = patientSearch.trim().toLowerCase();
+        const minAge = patientAgeMin === '' ? null : Number(patientAgeMin);
+        const maxAge = patientAgeMax === '' ? null : Number(patientAgeMax);
+        return allPatients.filter(patient => {
+            const age = calculateAge(patient.details?.birthday);
+            const gender = getPatientGenderValue(patient);
+            const roleName = patient.role?.name;
+            const matchesKeyword = !keyword || [
+                patient.display_name,
+                patient.username,
+                patient.details?.nation_id,
+                patient.details?.phone_number,
+            ].filter(Boolean).join(' ').toLowerCase().includes(keyword);
+            if (!matchesKeyword) return false;
+            if (patientGenderFilter !== 'all' && gender !== patientGenderFilter) return false;
+            if (patientRoleFilter !== 'all' && roleName !== patientRoleFilter) return false;
+            if (minAge !== null && (age === null || age < minAge)) return false;
+            if (maxAge !== null && (age === null || age > maxAge)) return false;
+            return true;
+        });
+    }, [allPatients, patientAgeMax, patientAgeMin, patientGenderFilter, patientRoleFilter, patientSearch]);
+
+    const handleSelectAllFilteredPatients = () => {
+        const nextIds = new Set(selectedPatientIds);
+        filteredAssignablePatients.forEach(patient => nextIds.add(String(patient.id)));
+        setSelectedPatientIds([...nextIds]);
+    };
+
+    const handleClearFilteredPatients = () => {
+        const filteredIds = new Set(filteredAssignablePatients.map(patient => String(patient.id)));
+        setSelectedPatientIds(prev => prev.filter(id => !filteredIds.has(id)));
+    };
+
+    const handleSaveManagerPatients = async () => {
+        if (!selectedManager) return;
+        const originalIds = managerPatients.map(patient => String(patient.id));
+        const nextIds = selectedPatientIds.map(String);
+        const idsToAdd = nextIds.filter(patientId => !originalIds.includes(patientId));
+        const idsToRemove = originalIds.filter(patientId => !nextIds.includes(patientId));
+        if (idsToAdd.length === 0 && idsToRemove.length === 0) {
+            setSelectedManager(null);
+            return;
+        }
+
+        setIsSavingAssignments(true);
+        try {
+            await Promise.all([
+                ...idsToAdd.map(patientId => managementApi.assignUser({
+                    user_id: parseInt(patientId),
+                    manager_id: selectedManager.id,
+                })),
+                ...idsToRemove.map(patientId => managementApi.unassignUser({
+                    user_id: parseInt(patientId),
+                    manager_id: selectedManager.id,
+                })),
+            ]);
+            showToast('個案指派已更新', 'success');
+            setSelectedManager(null);
+        } catch (error) {
+            showToast('個案指派更新失敗: ' + error.message, 'error');
+            fetchManagerPatients(selectedManager);
+        } finally {
+            setIsSavingAssignments(false);
+        }
     };
 
     const getRoleBadge = (roleId) => {
@@ -159,14 +294,14 @@ const BackendUserManagement = () => {
                                             {u.role_id === 5 ? (
                                                 <>
                                                     <button 
-                                                        onClick={() => handleUpdateRole(u.id, 2)}
+                                                        onClick={() => handleConfirmUpdateRole(u, 2)}
                                                         className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                                                         title="核准為個管師"
                                                     >
                                                         <UserCheck size={20} />
                                                     </button>
                                                     <button 
-                                                        onClick={() => handleUpdateRole(u.id, 1)}
+                                                        onClick={() => handleConfirmUpdateRole(u, 1)}
                                                         className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                                                         title="核准為超級管理員"
                                                     >
@@ -192,7 +327,7 @@ const BackendUserManagement = () => {
                                             )}
                                             {u.role_id !== 5 && u.role_id !== 1 && (
                                                 <button 
-                                                    onClick={() => handleUpdateRole(u.id, 5)}
+                                                    onClick={() => handleConfirmUpdateRole(u, 5)}
                                                     className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                                                     title="取消權限 (設為待審核)"
                                                 >
@@ -298,17 +433,20 @@ const BackendUserManagement = () => {
             {/* Manager Patients Modal */}
             {selectedManager && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden border border-sky-100">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden border border-sky-100">
                         <div className="p-6 border-b border-sky-100 flex justify-between items-center bg-sky-50/50">
                             <div>
                                 <h3 className="text-xl font-bold text-primary flex items-center space-x-2">
                                     <Users size={24} />
-                                    <span>{selectedManager.display_name} 負責的個案</span>
+                                    <span>指派個案給 {selectedManager.display_name}</span>
                                 </h3>
-                                <p className="text-xs text-text/50 mt-1 font-mono">{selectedManager.username}</p>
+                                <p className="text-xs text-text/50 mt-1 font-mono">
+                                    {selectedManager.username} / 已選 {selectedPatientIds.length} 位
+                                </p>
                             </div>
                             <button 
                                 onClick={() => setSelectedManager(null)}
+                                disabled={isSavingAssignments}
                                 className="p-2 hover:bg-white rounded-full text-text/40 hover:text-text transition-colors"
                             >
                                 <X size={24} />
@@ -318,52 +456,194 @@ const BackendUserManagement = () => {
                         <div className="flex-1 overflow-y-auto p-6">
                             {loadingPatients ? (
                                 <div className="text-center py-10 text-text/40">載入病患清單中...</div>
-                            ) : managerPatients.length === 0 ? (
-                                <div className="text-center py-10 space-y-4 text-text/40">
-                                    <p>目前尚未分配任何病患</p>
-                                    <button 
-                                        onClick={() => {
-                                            setSelectedManager(null);
-                                            navigate('/patients');
-                                        }}
-                                        className="text-primary text-sm font-bold hover:underline"
-                                    >
-                                        前往「個案管理」進行指派
-                                    </button>
-                                </div>
                             ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {managerPatients.map(patient => (
-                                        <div 
-                                            key={patient.id} 
-                                            className="p-4 rounded-2xl border border-sky-100 hover:border-primary/30 hover:bg-primary/5 transition-all group cursor-pointer"
-                                            onClick={() => navigate(`/patients/${patient.id}`)}
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <div>
-                                                    <p className="font-bold text-text">{patient.display_name}</p>
-                                                    <p className="text-xs text-text/40 font-mono">{patient.username}</p>
+                                <div className="space-y-4">
+                                    <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
+                                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_150px_170px_1fr]">
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">搜尋個案</span>
+                                                <div className="relative">
+                                                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text/35" />
+                                                    <input
+                                                        type="search"
+                                                        className="w-full min-h-10 rounded-lg border border-sky-100 bg-white pl-9 pr-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        placeholder="姓名、帳號、身分證、電話，例如 S0"
+                                                        value={patientSearch}
+                                                        onChange={(event) => setPatientSearch(event.target.value)}
+                                                    />
                                                 </div>
-                                                <ArrowRight size={18} className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </div>
-                                            <div className="mt-3 flex space-x-2">
-                                                <span className="px-2 py-0.5 bg-sky-100 text-primary text-[10px] font-bold rounded-md">
-                                                    {patient.details?.sarcopenia_level || '未分級'} 級
-                                                </span>
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">性別</span>
+                                                <select
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={patientGenderFilter}
+                                                    onChange={(event) => setPatientGenderFilter(event.target.value)}
+                                                >
+                                                    <option value="all">全部</option>
+                                                    <option value="male">男</option>
+                                                    <option value="female">女</option>
+                                                    <option value="other">其他/未知</option>
+                                                </select>
+                                            </label>
+                                            <label className="space-y-1">
+                                                <span className="text-[11px] font-bold text-text/50">實驗/對照組</span>
+                                                <select
+                                                    className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm font-medium text-text/70 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={patientRoleFilter}
+                                                    onChange={(event) => setPatientRoleFilter(event.target.value)}
+                                                >
+                                                    <option value="all">全部</option>
+                                                    <option value="實驗組">實驗組</option>
+                                                    <option value="對照組">對照組</option>
+                                                </select>
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <label className="space-y-1">
+                                                    <span className="text-[11px] font-bold text-text/50">最小年齡</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        value={patientAgeMin}
+                                                        onChange={(event) => setPatientAgeMin(event.target.value)}
+                                                    />
+                                                </label>
+                                                <label className="space-y-1">
+                                                    <span className="text-[11px] font-bold text-text/50">最大年齡</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        className="w-full min-h-10 rounded-lg border border-sky-100 bg-white px-3 text-sm text-text/80 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        value={patientAgeMax}
+                                                        onChange={(event) => setPatientAgeMax(event.target.value)}
+                                                    />
+                                                </label>
                                             </div>
                                         </div>
-                                    ))}
+                                        <div className="mt-3 flex flex-col gap-2 text-xs font-bold text-text/45 sm:flex-row sm:items-center sm:justify-between">
+                                            <span>顯示 {filteredAssignablePatients.length} / {allPatients.length} 位個案，目前已指派 {managerPatients.length} 位</span>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSelectAllFilteredPatients}
+                                                    disabled={filteredAssignablePatients.length === 0 || isSavingAssignments}
+                                                    className="rounded-lg border border-sky-100 bg-white px-3 py-1.5 text-primary hover:bg-sky-50 disabled:opacity-50"
+                                                >
+                                                    全選篩選結果
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClearFilteredPatients}
+                                                    disabled={filteredAssignablePatients.length === 0 || isSavingAssignments}
+                                                    className="rounded-lg border border-sky-100 bg-white px-3 py-1.5 text-primary hover:bg-sky-50 disabled:opacity-50"
+                                                >
+                                                    取消篩選結果
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPatientSearch('');
+                                                        setPatientGenderFilter('all');
+                                                        setPatientRoleFilter('all');
+                                                        setPatientAgeMin('');
+                                                        setPatientAgeMax('');
+                                                    }}
+                                                    className="rounded-lg border border-sky-100 bg-white px-3 py-1.5 text-text/55 hover:bg-sky-50"
+                                                >
+                                                    清除篩選
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-sky-100 bg-slate-50 p-2">
+                                        {allPatients.length === 0 ? (
+                                            <p className="py-8 text-center text-sm text-text/40">目前沒有可指派的個案</p>
+                                        ) : filteredAssignablePatients.length === 0 ? (
+                                            <p className="py-8 text-center text-sm text-text/40">沒有符合篩選條件的個案</p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                                                {filteredAssignablePatients.map(patient => {
+                                                    const patientId = String(patient.id);
+                                                    const checked = selectedPatientIds.includes(patientId);
+                                                    const age = calculateAge(patient.details?.birthday);
+                                                    const gender = getPatientGenderValue(patient);
+                                                    return (
+                                                        <label
+                                                            key={patient.id}
+                                                            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
+                                                                checked ? 'border-primary/30 bg-primary/5' : 'border-transparent bg-white hover:border-sky-200'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary/20"
+                                                                checked={checked}
+                                                                disabled={isSavingAssignments}
+                                                                onChange={() => toggleSelectedPatient(patient.id)}
+                                                            />
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="min-w-0">
+                                                                        <p className="truncate text-sm font-bold text-text">{patient.display_name}</p>
+                                                                        <p className="truncate text-xs font-mono text-text/40">@{patient.username} / {patient.details?.nation_id || '無身分代碼'}</p>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(event) => {
+                                                                            event.preventDefault();
+                                                                            navigate(`/patients/${patient.id}`);
+                                                                        }}
+                                                                        className="rounded-lg p-1 text-primary hover:bg-sky-50"
+                                                                        title="查看個案"
+                                                                    >
+                                                                        <ArrowRight size={16} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                                                                    <span className="rounded-md bg-sky-100 px-2 py-0.5 text-primary">
+                                                                        {patient.role?.name || '未分組'}
+                                                                    </span>
+                                                                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-text/50">
+                                                                        {gender === 'male' ? '男' : gender === 'female' ? '女' : '未知'}
+                                                                        {age !== null ? ` / ${age}歲` : ''}
+                                                                    </span>
+                                                                    <span className="rounded-md bg-green-100 px-2 py-0.5 text-green-700">
+                                                                        {patient.details?.sarcopenia_level || '未分級'} 級
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
                         
-                        <div className="p-6 border-t border-sky-100 bg-sky-50/20 text-right">
+                        <div className="flex items-center justify-between gap-3 border-t border-sky-100 bg-sky-50/20 p-6">
+                            <p className="text-xs font-bold text-text/45">
+                                儲存後會新增或解除此個管師與個案的指派關係。
+                            </p>
+                            <div className="flex gap-3">
                             <button 
                                 onClick={() => setSelectedManager(null)}
-                                className="px-6 py-2 bg-white border border-sky-200 text-text/70 rounded-xl font-bold hover:bg-sky-50 transition-colors text-sm"
+                                disabled={isSavingAssignments}
+                                className="px-6 py-2 bg-white border border-sky-200 text-text/70 rounded-xl font-bold hover:bg-sky-50 transition-colors text-sm disabled:opacity-50"
                             >
                                 關閉
                             </button>
+                                <button
+                                    onClick={handleSaveManagerPatients}
+                                    disabled={isSavingAssignments || loadingPatients}
+                                    className="rounded-xl bg-primary px-6 py-2 text-sm font-bold text-white shadow-sm hover:bg-primary-light disabled:opacity-50"
+                                >
+                                    {isSavingAssignments ? '儲存中...' : '儲存指派'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

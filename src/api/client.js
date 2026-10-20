@@ -1,4 +1,5 @@
-const API_BASE_URL = 'https://api.eldercare.fclinlab.com/api/v2';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || 'https://api.eldercare.fclinlab.com/api/v2';
 
 const getHeaders = () => {
   const token = localStorage.getItem('token');
@@ -33,8 +34,9 @@ export const apiFetch = async (endpoint, options = {}) => {
   });
 
   if (!response.ok) {
-    // 401 Unauthorized or 403 Forbidden: Clear token and logout
-    if (response.status === 401 || response.status === 403) {
+    // Only an expired/invalid login session should force logout. A 403 is a
+    // resource permission error and must keep the current management session.
+    if (response.status === 401) {
       console.warn(`Auth Error (${response.status}): Invalid token or session expired.`);
       localStorage.removeItem('token');
       // Only redirect to login if we are not already there
@@ -62,7 +64,7 @@ export const apiFetchBlob = async (endpoint, options = {}) => {
   const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       localStorage.removeItem('token');
       if (window.location.pathname !== '/login') window.location.href = '/login';
     }

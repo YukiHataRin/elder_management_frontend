@@ -1,9 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
-import { Clock, KeyRound, LayoutDashboard, Users, ClipboardList, Trophy, Settings, LogOut, X, FileText } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Bell, Clock, HeartHandshake, KeyRound, Users, ClipboardList, Trophy, Settings, LogOut, X, FileText, Megaphone, MessagesSquare, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { useToast } from '../context/useToast';
 import { managementApi } from '../api/management';
+import { managerNotificationsApi } from '../api/managerNotifications';
+
+const careOutreachEnabled = import.meta.env.VITE_CARE_OUTREACH_ENABLED === 'true';
 
 const Layout = ({ children }) => {
     const location = useLocation();
@@ -12,6 +15,68 @@ const Layout = ({ children }) => {
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [notificationUnread, setNotificationUnread] = useState(0);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+        try {
+            return window.localStorage.getItem('elder-sidebar-collapsed') === 'true';
+        } catch {
+            return false;
+        }
+    });
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem('elder-sidebar-collapsed', String(isSidebarCollapsed));
+        } catch {
+            // The sidebar still works when browser storage is unavailable.
+        }
+    }, [isSidebarCollapsed]);
+
+    useEffect(() => {
+        setIsMobileSidebarOpen(false);
+    }, [location.pathname]);
+
+    useEffect(() => {
+        if (!isMobileSidebarOpen) return undefined;
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') setIsMobileSidebarOpen(false);
+        };
+        const handleResize = () => {
+            if (window.innerWidth >= 768) setIsMobileSidebarOpen(false);
+        };
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('resize', handleResize);
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isMobileSidebarOpen]);
+
+    const refreshNotificationCount = useCallback(async () => {
+        if (![1, 2].includes(user?.role_id)) return;
+        try {
+            const result = await managerNotificationsApi.getUnreadCount();
+            setNotificationUnread(result.unread || 0);
+        } catch {
+            // The notification page will show a detailed error when opened.
+        }
+    }, [user?.role_id]);
+
+    useEffect(() => {
+        refreshNotificationCount();
+        const timer = window.setInterval(refreshNotificationCount, 60000);
+        window.addEventListener('manager-notifications-updated', refreshNotificationCount);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener('manager-notifications-updated', refreshNotificationCount);
+        };
+    }, [refreshNotificationCount]);
 
     const handleUpdatePassword = async (e) => {
         e.preventDefault();
@@ -58,6 +123,10 @@ const Layout = ({ children }) => {
 
     const navItems = [
         { path: '/patients', label: '個案管理', icon: <Users size={20} /> },
+        { path: '/notifications', label: '通知中心', icon: <Bell size={20} />, badge: notificationUnread },
+        { path: '/push-campaigns', label: '推播訊息', icon: <Megaphone size={20} /> },
+        ...(careOutreachEnabled ? [{ path: '/care-outreach', label: '關懷案件', icon: <HeartHandshake size={20} /> }] : []),
+        { path: '/chats', label: 'AI 對話紀錄', icon: <MessagesSquare size={20} /> },
         { path: '/questionnaires', label: '問卷管理', icon: <FileText size={20} /> },
         { path: '/tasks', label: '任務庫管理', icon: <ClipboardList size={20} /> },
         { path: '/gamification', label: '內生激勵與排名', icon: <Trophy size={20} /> },
@@ -79,58 +148,85 @@ const Layout = ({ children }) => {
     return (
         <div className="flex bg-background min-h-screen antialiased">
             {/* Sidebar */}
-            <aside className="w-64 bg-white border-r border-sky-100 flex flex-col shadow-sm hidden md:flex">
-                <div className="h-16 flex items-center px-6 border-b border-sky-100">
-                    <h1 className="text-xl font-bold text-primary font-lora truncate">Health Task Manager</h1>
+            <aside
+                className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} hidden flex-none flex-col border-r border-sky-100 bg-white shadow-sm transition-[width] duration-200 md:flex`}
+            >
+                <div className={`h-16 flex items-center border-b border-sky-100 ${isSidebarCollapsed ? 'justify-center px-3' : 'justify-between gap-2 px-4'}`}>
+                    {!isSidebarCollapsed && (
+                        <h1 className="min-w-0 truncate font-lora text-xl font-bold text-primary">Health Task Manager</h1>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+                        aria-label={isSidebarCollapsed ? '展開側邊欄' : '收合側邊欄'}
+                        aria-expanded={!isSidebarCollapsed}
+                        title={isSidebarCollapsed ? '展開側邊欄' : '收合側邊欄'}
+                        className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-text/50 transition-colors hover:bg-sky-50 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                        {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+                    </button>
                 </div>
                 <nav className="flex-1 py-4">
                     <ul>
                         {navItems.map((item) => {
                             const isActive = location.pathname.startsWith(item.path);
                             return (
-                                <li key={item.path} className="px-3 mb-1">
+                                <li key={item.path} className={`${isSidebarCollapsed ? 'px-2' : 'px-3'} mb-1`}>
                                     <Link
                                         to={item.path}
-                                        className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors duration-200 cursor-pointer ${isActive
+                                        title={isSidebarCollapsed ? item.label : undefined}
+                                        aria-label={isSidebarCollapsed ? item.label : undefined}
+                                        className={`relative flex h-11 items-center rounded-lg transition-colors duration-200 cursor-pointer ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3'} ${isActive
                                                 ? 'bg-primary-light/10 text-primary font-medium'
                                                 : 'text-text/70 hover:bg-sky-50 hover:text-text'
                                             }`}
                                     >
-                                        <span className={`${isActive ? 'text-primary' : 'text-text/50'}`}>
+                                        <span className={`flex-none ${isActive ? 'text-primary' : 'text-text/50'}`}>
                                             {item.icon}
                                         </span>
-                                        <span>{item.label}</span>
+                                        {!isSidebarCollapsed && <span className="min-w-0 truncate">{item.label}</span>}
+                                        {item.badge > 0 && (
+                                            <span className={`${isSidebarCollapsed ? 'absolute right-1 top-1' : 'ml-auto'} min-w-5 rounded-full bg-rose-600 px-1.5 py-0.5 text-center text-[11px] font-bold leading-4 text-white`}>
+                                                {item.badge > 99 ? '99+' : item.badge}
+                                            </span>
+                                        )}
                                     </Link>
                                 </li>
                             );
                         })}
                     </ul>
                 </nav>
-                <div className="p-4 border-t border-sky-100 space-y-4">
-                    <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                <div className={`${isSidebarCollapsed ? 'p-3' : 'p-4'} border-t border-sky-100 space-y-4`}>
+                    <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`} title={isSidebarCollapsed ? `${user?.display_name || '未登入'}｜${getRoleName(user?.role_id)}` : undefined}>
+                        <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-primary/20 font-bold text-primary">
                             {user?.display_name?.charAt(0) || '管'}
                         </div>
-                        <div className="text-sm overflow-hidden">
-                            <p className="font-medium text-text truncate">{user?.display_name || '未登入'}</p>
-                            <p className="text-xs text-text/50">{getRoleName(user?.role_id)}</p>
-                        </div>
+                        {!isSidebarCollapsed && (
+                            <div className="min-w-0 overflow-hidden text-sm">
+                                <p className="truncate font-medium text-text">{user?.display_name || '未登入'}</p>
+                                <p className="text-xs text-text/50">{getRoleName(user?.role_id)}</p>
+                            </div>
+                        )}
                     </div>
                     {user && (
                         <div className="space-y-2">
                             <button
                                 onClick={() => setShowPasswordModal(true)}
-                                className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-text/70 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
+                                aria-label={isSidebarCollapsed ? '修改密碼' : undefined}
+                                title={isSidebarCollapsed ? '修改密碼' : undefined}
+                                className={`flex h-9 w-full items-center rounded-lg text-sm text-text/70 transition-colors hover:bg-sky-50 cursor-pointer ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-2 px-3'}`}
                             >
-                                <KeyRound size={16} />
-                                <span>修改密碼</span>
+                                <KeyRound size={16} className="flex-none" />
+                                {!isSidebarCollapsed && <span>修改密碼</span>}
                             </button>
                             <button 
                                 onClick={logout}
-                                className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                aria-label={isSidebarCollapsed ? '登出系統' : undefined}
+                                title={isSidebarCollapsed ? '登出系統' : undefined}
+                                className={`flex h-9 w-full items-center rounded-lg text-sm text-rose-600 transition-colors hover:bg-rose-50 cursor-pointer ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-2 px-3'}`}
                             >
-                                <LogOut size={16} />
-                                <span>登出系統</span>
+                                <LogOut size={16} className="flex-none" />
+                                {!isSidebarCollapsed && <span>登出系統</span>}
                             </button>
                         </div>
                     )}
@@ -140,9 +236,114 @@ const Layout = ({ children }) => {
             {/* Main Content */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Mobile Header */}
-                <header className="md:hidden h-14 bg-white border-b border-sky-100 flex items-center justify-between px-4">
-                    <h1 className="font-bold text-primary font-lora">Health Task Manager</h1>
+                <header className="flex h-14 items-center justify-between border-b border-sky-100 bg-white px-3 md:hidden">
+                    <button
+                        type="button"
+                        onClick={() => setIsMobileSidebarOpen(true)}
+                        aria-label="開啟導覽選單"
+                        aria-expanded={isMobileSidebarOpen}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-primary transition-colors hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                        <Menu size={22} />
+                    </button>
+                    <h1 className="min-w-0 truncate px-2 font-lora font-bold text-primary">Health Task Manager</h1>
+                    <Link to="/notifications" aria-label="開啟通知中心" className="relative rounded-lg p-2 text-primary hover:bg-sky-50">
+                        <Bell size={21} />
+                        {notificationUnread > 0 && (
+                            <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                                {notificationUnread > 99 ? '99+' : notificationUnread}
+                            </span>
+                        )}
+                    </Link>
                 </header>
+
+                {/* Mobile Navigation Drawer */}
+                <div
+                    className={`fixed inset-0 z-40 md:hidden ${isMobileSidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+                    aria-hidden={!isMobileSidebarOpen}
+                    inert={!isMobileSidebarOpen}
+                >
+                    <button
+                        type="button"
+                        onClick={() => setIsMobileSidebarOpen(false)}
+                        aria-label="關閉導覽選單"
+                        tabIndex={isMobileSidebarOpen ? 0 : -1}
+                        className={`absolute inset-0 bg-black/35 transition-opacity duration-200 ${isMobileSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
+                    />
+                    <aside className={`relative flex h-full w-[min(82vw,20rem)] flex-col bg-white shadow-xl transition-transform duration-200 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                        <div className="flex h-14 items-center justify-between border-b border-sky-100 px-4">
+                            <h2 className="truncate font-lora text-lg font-bold text-primary">Health Task Manager</h2>
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileSidebarOpen(false)}
+                                aria-label="關閉導覽選單"
+                                className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-text/50 hover:bg-sky-50 hover:text-primary"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <nav className="flex-1 overflow-y-auto py-4">
+                            <ul>
+                                {navItems.map((item) => {
+                                    const isActive = location.pathname.startsWith(item.path);
+                                    return (
+                                        <li key={item.path} className="mb-1 px-3">
+                                            <Link
+                                                to={item.path}
+                                                className={`relative flex h-11 items-center gap-3 rounded-lg px-3 transition-colors ${isActive
+                                                        ? 'bg-primary-light/10 font-medium text-primary'
+                                                        : 'text-text/70 hover:bg-sky-50 hover:text-text'
+                                                    }`}
+                                            >
+                                                <span className={`flex-none ${isActive ? 'text-primary' : 'text-text/50'}`}>{item.icon}</span>
+                                                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                                                {item.badge > 0 && (
+                                                    <span className="min-w-5 rounded-full bg-rose-600 px-1.5 py-0.5 text-center text-[11px] font-bold leading-4 text-white">
+                                                        {item.badge > 99 ? '99+' : item.badge}
+                                                    </span>
+                                                )}
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </nav>
+                        <div className="space-y-4 border-t border-sky-100 p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-primary/20 font-bold text-primary">
+                                    {user?.display_name?.charAt(0) || '管'}
+                                </div>
+                                <div className="min-w-0 text-sm">
+                                    <p className="truncate font-medium text-text">{user?.display_name || '未登入'}</p>
+                                    <p className="text-xs text-text/50">{getRoleName(user?.role_id)}</p>
+                                </div>
+                            </div>
+                            {user && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsMobileSidebarOpen(false);
+                                            setShowPasswordModal(true);
+                                        }}
+                                        className="flex h-10 items-center justify-center gap-2 rounded-lg bg-sky-50 px-3 text-sm text-text/70"
+                                    >
+                                        <KeyRound size={16} />
+                                        <span>修改密碼</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={logout}
+                                        className="flex h-10 items-center justify-center gap-2 rounded-lg bg-rose-50 px-3 text-sm text-rose-600"
+                                    >
+                                        <LogOut size={16} />
+                                        <span>登出系統</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+                </div>
 
                 {/* Page Content */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-background/50">
